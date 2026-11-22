@@ -1,0 +1,13 @@
+node_modules/
+/dist/
+!skills/*/*/dist/
+!skills/*/*/dist/cli.mjs
+coverage/
+.fallow/
+.DS_Store
+
+.env
+.env.*
+!.env.example
+
+.worktrees/

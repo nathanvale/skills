@@ -1,0 +1,36 @@
+{
+  "name": "skills",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.4",
+  "scripts": {
+    "start": "bun run src/cli.ts",
+    "build:skills": "bun run scripts/build-skill-clis.ts",
+    "check:skills": "bun run scripts/build-skill-clis.ts --check",
+    "check": "bun run check:skills && bun run lint && bun run format:check && bun run typecheck && bun run test && bun run --silent quality:fallow",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "bun test",
+    "quality:fallow": "node_modules/.bin/fallow dead-code --format json --quiet --type-aware --type-aware-require complete --fail-on-issues",
+    "lint": "eslint . --max-warnings 0",
+    "format:check": "biome format .",
+    "format": "biome format --write ."
+  },
+  "dependencies": {
+    "agent-cli-kernel": "github:nathanvale/agent-cli-kernel#426e5dbdb09fada8950f3aaea3b5204f1da40907"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.7",
+    "@types/bun": "1.4.4",
+    "fallow": "3.43.2",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "@typescript/native": "npm:typescript@7.1.0-beta",
+    "eslint": "10.15.0",
+    "@eslint/js": "10.0.1",
+    "typescript-eslint": "8.73.0",
+    "fallow-type-aware": "3.43.2"
+  },
+  "overrides": {
+    "@typescript/old@npm:typescript@^6": "npm:typescript@6.0.2"
+  }
+}

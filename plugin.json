@@ -1,0 +1,10 @@
+{
+  "author": "Nathan Vale",
+  "description": "Nathan Vale's reusable agent skills with portable agent-cli-kernel CLIs.",
+  "name": "nathanvale-skills",
+  "skills": [
+    "./skills/engineering/hello-world",
+    "./skills/engineering/weekly-hardening"
+  ],
+  "version": "0.1.0"
+}

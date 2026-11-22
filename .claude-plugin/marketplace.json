@@ -1,0 +1,17 @@
+{
+  "name": "nathanvale",
+  "owner": {
+    "name": "Nathan Vale",
+    "url": "https://github.com/nathanvale"
+  },
+  "description": "Nathan Vale's agent skills with portable agent-cli-kernel CLIs.",
+  "plugins": [
+    {
+      "name": "nathanvale-skills",
+      "source": "./",
+      "description": "Nathan Vale's reusable agent skills with portable agent-cli-kernel CLIs.",
+      "category": "engineering",
+      "keywords": ["engineering", "skills", "determinism", "cli"]
+    }
+  ]
+}
