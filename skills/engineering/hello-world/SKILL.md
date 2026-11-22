@@ -1,5 +1,4 @@
 ---
-
 name: hello-world
 description: Portable reference skill backed by a bundled agent-cli-kernel CLI that runs with zero node_modules.
 disable-model-invocation: true

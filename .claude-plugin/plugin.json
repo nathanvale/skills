@@ -2,6 +2,7 @@
   "name": "nathanvale-skills",
   "version": "0.1.0",
   "description": "Nathan Vale's reusable agent skills with portable agent-cli-kernel CLIs.",
+  "license": "MIT",
   "author": {
     "name": "Nathan Vale",
     "url": "https://github.com/nathanvale"

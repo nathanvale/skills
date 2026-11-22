@@ -1,5 +1,4 @@
 ---
-
 name: weekly-hardening
 description: Weekly 7-day determinism pass turning recent mistakes, CI flakes, suppressions, and loop friction into verified structural gates (0 to 3 PRs, or a dry-run report).
 disable-model-invocation: true

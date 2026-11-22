@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { cpSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   buildSkillClis,
@@ -199,5 +199,38 @@ test("portable skill CLI bundles match fresh builds and repository catalogs stay
       "utf8",
     );
     expect(committed).toBe(rendered);
+  }
+});
+
+test("validate refuses a blank line after the opening front matter fence and a user-only skill without its Codex policy", () => {
+  const copy = testFolder("skills-planted-");
+  try {
+    cpSync(join(repositoryRoot(), "skills"), join(copy, "skills"), {
+      recursive: true,
+    });
+    cpSync(
+      join(repositoryRoot(), ".claude-plugin"),
+      join(copy, ".claude-plugin"),
+      { recursive: true },
+    );
+    cpSync(join(repositoryRoot(), "plugin.json"), join(copy, "plugin.json"));
+    expect(validateSkillsRepository(copy).issues).toEqual([]);
+
+    const skillFile = join(
+      copy,
+      "skills/engineering/weekly-hardening/SKILL.md",
+    );
+    writeFileSync(
+      skillFile,
+      readFileSync(skillFile, "utf8").replace(/^---\n/, "---\n\n"),
+    );
+    rmSync(join(copy, "skills/engineering/hello-world/agents/openai.yaml"));
+
+    expect(validateSkillsRepository(copy).issues).toEqual([
+      'skills/engineering/hello-world: disable-model-invocation is true but Codex ignores it. Repair: add agents/openai.yaml with "policy:" and "  allow_implicit_invocation: false".',
+      'skills/engineering/weekly-hardening/SKILL.md: frontmatter must start with a field on the line after the opening "---". Repair: delete the blank line after "---".',
+    ]);
+  } finally {
+    rmSync(copy, { recursive: true, force: true });
   }
 });
