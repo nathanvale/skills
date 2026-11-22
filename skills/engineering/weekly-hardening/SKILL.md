@@ -48,7 +48,7 @@ Select the highest **ladder** rung that closes each **active leak** with low upk
 Apply four filters before opening any worktree:
 
 - **Active-leak filter:** keep classes that still admit new mistakes today; defer janitorial sweeps of legacy debt already blocked by an existing gate.
-- **Boundary filter:** skip protected paths unless a live bug justifies re-qualification; park candidates whose files overlap an active open PR.
+- **Boundary filter:** skip protected paths; when a live bug sits in one, report it in the handback for the repository owner to decide and build nothing for it; park candidates whose files overlap an active open PR.
 - **Backtest filter:** run a fast probe script on top lint or sweep candidates against historical witnesses and current `HEAD`; keep only candidates with high witness recall and low false-positive noise.
 - **File-disjoint plan:** keep parallel branches **file-disjoint**; sequence any two units that edit the same shared choke-point file (standards table, suppressions, timings, or lint configs), or limit the batch to 1 unit per choke-point file.
 
