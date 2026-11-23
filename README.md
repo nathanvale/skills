@@ -52,6 +52,26 @@ npx skills@latest add nathanvale/skills
 
 None yet.
 
+## Hooks
+
+### Coordinator reground (Claude Code)
+
+After a coordinator session's context is compacted, this `SessionStart` hook puts a short reground note back into that session's context. It stays silent for every session that is not on the coordinator roster, and for subagents.
+
+A coordinator registers itself from its own shell (replace `example-coordinator` with its folder name under `~/.local/state/kernel-split/`):
+
+```sh
+mkdir -p ~/.local/state/kernel-split/coordinator-roster && printf '%s\n' example-coordinator > ~/.local/state/kernel-split/coordinator-roster/"${CLAUDE_CODE_SESSION_ID:?}"
+```
+
+and removes itself with:
+
+```sh
+rm ~/.local/state/kernel-split/coordinator-roster/"${CLAUDE_CODE_SESSION_ID:?}"
+```
+
+Set `COORDINATOR_ROSTER_DIR` to an absolute path to use another roster folder. The hook needs `bun` on `PATH`; without it, the hook does nothing.
+
 ## Adding a skill with a portable kernel CLI
 
 1. Put the skill's `agent-cli-kernel` command and contract in `src/skill-clis/<skill>.ts` and export the command into `src/commands.ts` so the front-door CLI exposes it too.

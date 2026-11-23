@@ -7,6 +7,7 @@
     "url": "https://github.com/nathanvale"
   },
   "repository": "https://github.com/nathanvale/skills",
+  "hooks": "./hooks/claude/hooks.json",
   "skills": [
     "./skills/engineering/hello-world",
     "./skills/engineering/weekly-hardening"

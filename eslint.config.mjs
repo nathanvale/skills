@@ -61,6 +61,10 @@ export default tseslint.config(
     },
   },
   {
+    files: ["src/compaction-reground/compaction-reground.ts"],
+    rules: { "repository/no-domain-output": "off" },
+  },
+  {
     files: ["scripts/**/*.ts"],
     languageOptions: {
       parser: tseslint.parser,
