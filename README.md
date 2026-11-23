@@ -61,8 +61,8 @@ After a coordinator session's context is compacted, this `SessionStart` hook put
 The hook reads one state folder:
 
 - `COORDINATION_STATE_DIR`, when it is set to an absolute path of at most 256 characters with no control characters. A relative, longer, or control-character value makes the hook stay silent.
-- Otherwise, `$XDG_STATE_HOME/agent-coordination`, when `XDG_STATE_HOME` is an absolute path.
-- Otherwise, `$HOME/.local/state/agent-coordination`.
+- Otherwise, `$XDG_STATE_HOME/my-agent-dojo/agent-coordination`, when `XDG_STATE_HOME` is an absolute path.
+- Otherwise, `$HOME/.local/state/my-agent-dojo/agent-coordination`.
 
 The roster is the `coordinator-roster` folder inside the state folder. Each roster entry is a file named by a session id. Its first line is the coordinator's folder name in the state folder: lowercase letters, digits, and hyphens, up to 64 characters. Any other first line gets a note without the folder name.
 
@@ -71,14 +71,14 @@ Claude Code passes its own environment to the hook. Set `COORDINATION_STATE_DIR`
 To register a coordinator, run these commands from its own shell. Replace `example-coordinator` with its folder name:
 
 ```sh
-roster="${COORDINATION_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/agent-coordination}/coordinator-roster"
+roster="${COORDINATION_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/my-agent-dojo/agent-coordination}/coordinator-roster"
 mkdir -p "$roster" && printf '%s\n' example-coordinator > "$roster/${CLAUDE_CODE_SESSION_ID:?}"
 ```
 
 To remove it, run:
 
 ```sh
-roster="${COORDINATION_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/agent-coordination}/coordinator-roster"
+roster="${COORDINATION_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/my-agent-dojo/agent-coordination}/coordinator-roster"
 rm "$roster/${CLAUDE_CODE_SESSION_ID:?}"
 ```
 

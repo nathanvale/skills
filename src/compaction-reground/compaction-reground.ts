@@ -2,7 +2,7 @@ import { closeSync, lstatSync, openSync, readSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 
 const STATE_FOLDER_VARIABLE = "COORDINATION_STATE_DIR";
-const STATE_FOLDER_NAME = "agent-coordination";
+const STATE_FOLDER_SEGMENTS = ["my-agent-dojo", "agent-coordination"];
 const STATE_FOLDER_MAX_LENGTH = 256;
 const CONTROL_CHARACTER_PATTERN = /\p{Cc}/u;
 const ROSTER_FOLDER_NAME = "coordinator-roster";
@@ -45,13 +45,13 @@ function stateFolder(): string | null {
   const xdgStateHome = process.env.XDG_STATE_HOME;
 
   if (xdgStateHome && isAbsolute(xdgStateHome)) {
-    return join(xdgStateHome, STATE_FOLDER_NAME);
+    return join(xdgStateHome, ...STATE_FOLDER_SEGMENTS);
   }
 
   const home = process.env.HOME;
 
   if (home && isAbsolute(home)) {
-    return join(home, ".local", "state", STATE_FOLDER_NAME);
+    return join(home, ".local", "state", ...STATE_FOLDER_SEGMENTS);
   }
 
   return null;

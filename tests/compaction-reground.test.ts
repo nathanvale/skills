@@ -64,6 +64,7 @@ const systemShell = join(systemShellFolder, "sh");
 const trustedPath = `${bunDirectory}:${systemShellFolder}`;
 const hookOutputByteLimit = 1500;
 const stateFolderLengthLimit = 256;
+const defaultStateFolderSegments = ["my-agent-dojo", "agent-coordination"];
 
 const SESSION_ID = "11111111-2222-4333-8444-555555555555";
 const COORDINATOR_FOLDER = "example-coordinator";
@@ -119,7 +120,7 @@ function makeDirectory(): string {
 }
 
 function handWrittenDefaultStateFolder(home: string): string {
-  return join(home, ".local", "state", "agent-coordination");
+  return join(home, ".local", "state", ...defaultStateFolderSegments);
 }
 
 function rosterFolderIn(stateFolder: string): string {
@@ -474,11 +475,11 @@ describe("coordinator reground hook public process", () => {
 });
 
 describe("coordinator reground hook state folder", () => {
-  test("defaults to agent-coordination under the HOME state folder", () => {
+  test("defaults to my-agent-dojo/agent-coordination under the HOME state folder", () => {
     const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
 
     expect(stateFolder).toBe(
-      join(home, ".local", "state", "agent-coordination"),
+      join(home, ".local", "state", "my-agent-dojo", "agent-coordination"),
     );
     expectRegroundText(
       runHook(compactInput(), { HOME: home }),
@@ -486,10 +487,10 @@ describe("coordinator reground hook state folder", () => {
     );
   });
 
-  test("uses agent-coordination under an absolute XDG_STATE_HOME before HOME", () => {
+  test("uses my-agent-dojo/agent-coordination under an absolute XDG_STATE_HOME before HOME", () => {
     const { home } = homeWithRoster(ROSTER_LINE);
     const xdgStateHome = makeDirectory();
-    const stateFolder = join(xdgStateHome, "agent-coordination");
+    const stateFolder = join(xdgStateHome, ...defaultStateFolderSegments);
     writeStateRoster(stateFolder);
 
     expectRegroundText(
@@ -498,12 +499,23 @@ describe("coordinator reground hook state folder", () => {
     );
   });
 
+  test("stays silent for a roster entry in the HOME state folder without my-agent-dojo", () => {
+    const home = makeDirectory();
+    writeStateRoster(
+      join(home, ".local", "state", ...defaultStateFolderSegments.slice(1)),
+    );
+
+    expectSilence(runHook(compactInput(), { HOME: home }));
+  });
+
   test("falls back to HOME for a relative XDG_STATE_HOME", () => {
     const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
     const { pluginRoot, copied } = copiedPluginLauncher();
     const project = makeDirectory();
     for (const base of [join(pluginRoot, "hooks", "coordinator"), project]) {
-      writeStateRoster(join(base, "relative-state", "agent-coordination"));
+      writeStateRoster(
+        join(base, "relative-state", ...defaultStateFolderSegments),
+      );
     }
 
     expectRegroundText(
@@ -520,7 +532,7 @@ describe("coordinator reground hook state folder", () => {
   test("reads the state folder named by COORDINATION_STATE_DIR before XDG_STATE_HOME and HOME", () => {
     const { home } = homeWithRoster(ROSTER_LINE);
     const xdgStateHome = makeDirectory();
-    writeStateRoster(join(xdgStateHome, "agent-coordination"));
+    writeStateRoster(join(xdgStateHome, ...defaultStateFolderSegments));
     const stateFolder = makeDirectory();
     writeStateRoster(stateFolder);
 
