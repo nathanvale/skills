@@ -40,7 +40,11 @@ const KNOWN_BUCKETS: ReadonlyMap<string, SkillBucket> = new Map([
   ["deprecated", "deprecated"],
 ]);
 
-const MODULE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const MODULE_ROOT = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+);
 
 function compareCodeUnit(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;

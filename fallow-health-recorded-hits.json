@@ -1,0 +1,29 @@
+{
+  "kind": "health",
+  "finding_counts": {
+    "src/skills-catalog/skills-catalog.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "tests/compaction-reground.test.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    }
+  },
+  "identity_finding_counts": {
+    "src/skills-catalog/skills-catalog.ts\u0000discoverSkills": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "tests/compaction-reground.test.ts\u0000<file>": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    }
+  },
+  "runtime_coverage_findings": [],
+  "target_keys": []
+}
