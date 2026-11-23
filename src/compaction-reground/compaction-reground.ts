@@ -24,6 +24,7 @@ function regroundText(stateFolder: string, folder: string | null): string {
     `2. Reread your own unit state in ${unitState} and the last rows of its decisions.tsv.`,
     "3. Confirm each unit against GitHub and git. The summary above is a note, not proof.",
     "4. Send the Super Coordinator one message with your rules version and each unit's state.",
+    "If a message arrives before step 4, say in one line that you are regrounding, finish steps 1 and 2, then act on it.",
   ].join("\n");
 }
 

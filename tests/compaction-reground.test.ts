@@ -80,7 +80,8 @@ Do no merge, push, post or other gated act until all four steps are done:
 1. Reread the standing orders and the working instructions in ${stateFolder} in full.
 2. Reread your own unit state in ${stateFolder}/${folder}/ and the last rows of its decisions.tsv.
 3. Confirm each unit against GitHub and git. The summary above is a note, not proof.
-4. Send the Super Coordinator one message with your rules version and each unit's state.`;
+4. Send the Super Coordinator one message with your rules version and each unit's state.
+If a message arrives before step 4, say in one line that you are regrounding, finish steps 1 and 2, then act on it.`;
 }
 
 function handWrittenGenericRegroundTextOracle(stateFolder: string): string {
@@ -90,7 +91,8 @@ Do no merge, push, post or other gated act until all four steps are done:
 1. Reread the standing orders and the working instructions in ${stateFolder} in full.
 2. Reread your own unit state in your coordinator folder under ${stateFolder}/ and the last rows of its decisions.tsv.
 3. Confirm each unit against GitHub and git. The summary above is a note, not proof.
-4. Send the Super Coordinator one message with your rules version and each unit's state.`;
+4. Send the Super Coordinator one message with your rules version and each unit's state.
+If a message arrives before step 4, say in one line that you are regrounding, finish steps 1 and 2, then act on it.`;
 }
 
 const temporaryDirectories: string[] = [];
