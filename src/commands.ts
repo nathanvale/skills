@@ -8,7 +8,10 @@ import {
   helloWorldCauses,
   helloWorldCommand,
 } from "./skill-clis/hello-world.ts";
-import { discoverSkills, validateSkillsRepository } from "./skills-catalog.ts";
+import {
+  discoverSkills,
+  validateSkillsRepository,
+} from "./skills-catalog/skills-catalog.ts";
 
 const causes = {
   ...sharedCauses,

@@ -18,7 +18,7 @@ import {
   discoverSkills,
   repositoryRoot,
   validateSkillsRepository,
-} from "../src/skills-catalog.ts";
+} from "../src/skills-catalog/skills-catalog.ts";
 import { testFolder } from "./support/test-folder.ts";
 
 const repoCli = join(repositoryRoot(), "src", "cli.ts");
