@@ -44,6 +44,11 @@ interface PluginManifest {
   hooks: string;
 }
 
+interface RosteredHome {
+  home: string;
+  stateFolder: string;
+}
+
 const repositoryRoot = join(import.meta.dir, "..");
 const launcherFolder = join(repositoryRoot, "hooks", "coordinator");
 const launcherName = "compaction-reground.sh";
@@ -57,26 +62,35 @@ const bunDirectory = dirname(process.execPath);
 const systemShellFolder = "/bin";
 const systemShell = join(systemShellFolder, "sh");
 const hookOutputByteLimit = 1500;
+const stateFolderLengthLimit = 256;
+const legacyStateFolderName = ["kernel", "split"].join("-");
 
 const SESSION_ID = "11111111-2222-4333-8444-555555555555";
 const COORDINATOR_FOLDER = "example-coordinator";
 const ROSTER_LINE = `${COORDINATOR_FOLDER}\n`;
 
-const HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE = `Coordinator reground: your context was just compacted. This session is registered as a kernel-split coordinator (example-coordinator).
+function handWrittenNamedRegroundTextOracle(
+  stateFolder: string,
+  folder: string = COORDINATOR_FOLDER,
+): string {
+  return `Coordinator reground: your context was just compacted. This session is registered as a coordinator (${folder}).
 
 Do no merge, push, post or other gated act until all four steps are done:
-1. Reread ~/.local/state/kernel-split/STANDING-ORDERS.md and ~/.local/state/kernel-split/WORKING-INSTRUCTIONS.md in full.
-2. Reread your own unit state in ~/.local/state/kernel-split/example-coordinator/ and the last rows of its decisions.tsv.
+1. Reread the standing orders and the working instructions in ${stateFolder} in full.
+2. Reread your own unit state in ${stateFolder}/${folder}/ and the last rows of its decisions.tsv.
 3. Confirm each unit against GitHub and git. The summary above is a note, not proof.
 4. Send the Super Coordinator one message with your rules version and each unit's state.`;
+}
 
-const HAND_WRITTEN_GENERIC_REGROUND_TEXT_ORACLE = `Coordinator reground: your context was just compacted. This session is registered as a kernel-split coordinator.
+function handWrittenGenericRegroundTextOracle(stateFolder: string): string {
+  return `Coordinator reground: your context was just compacted. This session is registered as a coordinator.
 
 Do no merge, push, post or other gated act until all four steps are done:
-1. Reread ~/.local/state/kernel-split/STANDING-ORDERS.md and ~/.local/state/kernel-split/WORKING-INSTRUCTIONS.md in full.
-2. Reread your own unit state in your coordinator folder under ~/.local/state/kernel-split/ and the last rows of its decisions.tsv.
+1. Reread the standing orders and the working instructions in ${stateFolder} in full.
+2. Reread your own unit state in your coordinator folder under ${stateFolder}/ and the last rows of its decisions.tsv.
 3. Confirm each unit against GitHub and git. The summary above is a note, not proof.
 4. Send the Super Coordinator one message with your rules version and each unit's state.`;
+}
 
 const temporaryDirectories: string[] = [];
 let transcriptFolder = "";
@@ -104,8 +118,12 @@ function makeDirectory(): string {
   return directory;
 }
 
-function handWrittenDefaultRosterDirectory(home: string): string {
-  return join(home, ".local", "state", "kernel-split", "coordinator-roster");
+function handWrittenDefaultStateFolder(home: string): string {
+  return join(home, ".local", "state", "agent-coordination");
+}
+
+function rosterFolderIn(stateFolder: string): string {
+  return join(stateFolder, "coordinator-roster");
 }
 
 function writeRoster(
@@ -119,10 +137,32 @@ function writeRoster(
   return entry;
 }
 
-function homeWithRoster(content: string, sessionId = SESSION_ID): string {
+function writeStateRoster(
+  stateFolder: string,
+  content: string = ROSTER_LINE,
+  sessionId: string = SESSION_ID,
+): string {
+  return writeRoster(rosterFolderIn(stateFolder), sessionId, content);
+}
+
+function homeWithRoster(
+  content: string,
+  sessionId: string = SESSION_ID,
+): RosteredHome {
   const home = makeDirectory();
-  writeRoster(handWrittenDefaultRosterDirectory(home), sessionId, content);
-  return home;
+  const stateFolder = handWrittenDefaultStateFolder(home);
+  writeStateRoster(stateFolder, content, sessionId);
+  return { home, stateFolder };
+}
+
+function stateFolderOfLength(length: number): string {
+  let folder = makeDirectory();
+  while (length - folder.length > 201) {
+    folder = join(folder, "s".repeat(100));
+  }
+  folder = join(folder, "s".repeat(length - folder.length - 1));
+  mkdirSync(folder, { recursive: true });
+  return folder;
 }
 
 function finished(child: {
@@ -220,37 +260,41 @@ function runDeclaredCommand(
   );
 }
 
+function copiedPluginLauncher(): { pluginRoot: string; copied: string } {
+  const pluginRoot = makeDirectory();
+  copyPluginWithoutExecutableBits(pluginRoot);
+  return {
+    pluginRoot,
+    copied: join(pluginRoot, "hooks", "coordinator", launcherName),
+  };
+}
+
 describe("coordinator reground hook public process", () => {
   test("regrounds a rostered coordinator by its folder name", () => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
 
     expectRegroundText(
       runHook(compactInput(), { HOME: home }),
-      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
+      handWrittenNamedRegroundTextOracle(stateFolder),
     );
   });
 
   test("uses the generic wording for an empty roster entry", () => {
-    const home = homeWithRoster("");
+    const { home, stateFolder } = homeWithRoster("");
 
     expectRegroundText(
       runHook(compactInput(), { HOME: home }),
-      HAND_WRITTEN_GENERIC_REGROUND_TEXT_ORACLE,
+      handWrittenGenericRegroundTextOracle(stateFolder),
     );
   });
 
   test("keeps the line under the byte limit for the longest folder name", () => {
     const longestFolder = `a${"b".repeat(63)}`;
-    const home = homeWithRoster(`${longestFolder}\n`);
-
-    const result = runHook(compactInput(), { HOME: home });
+    const { home, stateFolder } = homeWithRoster(`${longestFolder}\n`);
 
     expectRegroundText(
-      result,
-      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE.replaceAll(
-        COORDINATOR_FOLDER,
-        longestFolder,
-      ),
+      runHook(compactInput(), { HOME: home }),
+      handWrittenNamedRegroundTextOracle(stateFolder, longestFolder),
     );
   });
 
@@ -258,40 +302,45 @@ describe("coordinator reground hook public process", () => {
     { label: "a traversal", first: "../x" },
     { label: "spaces and capitals", first: "Bad Name" },
     { label: "a leading hyphen", first: "-rf" },
-    { label: "a slash", first: "kernel-split/other" },
+    { label: "a slash", first: "example-state/other" },
   ])("refuses a folder name with $label and never echoes it", ({ first }) => {
-    const home = homeWithRoster(`${first}\n`);
+    const { home, stateFolder } = homeWithRoster(`${first}\n`);
 
     const result = runHook(compactInput(), { HOME: home });
 
-    expectRegroundText(result, HAND_WRITTEN_GENERIC_REGROUND_TEXT_ORACLE);
+    expectRegroundText(
+      result,
+      handWrittenGenericRegroundTextOracle(stateFolder),
+    );
     expect(result.stdout).not.toContain(first);
   });
 
   test("reads only the first line of a long roster entry", () => {
     const tail = "NEVER-ECHO-THIS".repeat(40);
-    const home = homeWithRoster(`${COORDINATOR_FOLDER}\n${tail}\n`);
+    const { home, stateFolder } = homeWithRoster(
+      `${COORDINATOR_FOLDER}\n${tail}\n`,
+    );
 
     const result = runHook(compactInput(), { HOME: home });
 
-    expectRegroundText(result, HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE);
+    expectRegroundText(result, handWrittenNamedRegroundTextOracle(stateFolder));
     expect(result.stdout).not.toContain("NEVER-ECHO-THIS");
   });
 
   test("works when run by bare file name from its own folder", () => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
 
     expectRegroundText(
       runHook(compactInput(), { HOME: home }, launcherFolder, [
         systemShell,
         launcherName,
       ]),
-      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
+      handWrittenNamedRegroundTextOracle(stateFolder),
     );
   });
 
   test("stays silent for a session that is not on the roster", () => {
-    const home = homeWithRoster(ROSTER_LINE, "some-other-session");
+    const { home } = homeWithRoster(ROSTER_LINE, "some-other-session");
 
     expectSilence(runHook(compactInput(), { HOME: home }));
   });
@@ -303,14 +352,14 @@ describe("coordinator reground hook public process", () => {
   test.each(["startup", "resume", "clear", "fork"])(
     "stays silent for the %s session source",
     (source) => {
-      const home = homeWithRoster(ROSTER_LINE);
+      const { home } = homeWithRoster(ROSTER_LINE);
 
       expectSilence(runHook(compactInput({ source }), { HOME: home }));
     },
   );
 
   test("stays silent for another hook event", () => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home } = homeWithRoster(ROSTER_LINE);
 
     expectSilence(
       runHook(compactInput({ hook_event_name: "SessionEnd" }), { HOME: home }),
@@ -318,7 +367,7 @@ describe("coordinator reground hook public process", () => {
   });
 
   test("stays silent for a subagent identified by agent_id", () => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home } = homeWithRoster(ROSTER_LINE);
 
     expectSilence(
       runHook(compactInput({ agent_id: "agent_01abc" }), { HOME: home }),
@@ -326,7 +375,7 @@ describe("coordinator reground hook public process", () => {
   });
 
   test("stays silent for a subagent identified by its transcript path", () => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home } = homeWithRoster(ROSTER_LINE);
 
     expectSilence(
       runHook(
@@ -345,7 +394,7 @@ describe("coordinator reground hook public process", () => {
     { label: "a JSON string", input: '"compact"' },
     { label: "null", input: "null" },
   ])("stays silent for $label", ({ input }) => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home } = homeWithRoster(ROSTER_LINE);
 
     expectSilence(runHook(input, { HOME: home }));
   });
@@ -358,7 +407,7 @@ describe("coordinator reground hook public process", () => {
     { label: "a session_id with a dot", sessionId: "session.jsonl" },
     { label: "a session_id with a slash", sessionId: "a/b" },
   ])("stays silent for $label", ({ sessionId }) => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home } = homeWithRoster(ROSTER_LINE);
 
     expectSilence(
       runHook(compactInput({ session_id: sessionId }), { HOME: home }),
@@ -367,16 +416,17 @@ describe("coordinator reground hook public process", () => {
 
   test("stays silent when the roster entry is a directory", () => {
     const home = makeDirectory();
-    mkdirSync(join(handWrittenDefaultRosterDirectory(home), SESSION_ID), {
-      recursive: true,
-    });
+    mkdirSync(
+      join(rosterFolderIn(handWrittenDefaultStateFolder(home)), SESSION_ID),
+      { recursive: true },
+    );
 
     expectSilence(runHook(compactInput(), { HOME: home }));
   });
 
   test("stays silent when the roster entry is a symlink to a file", () => {
-    const home = homeWithRoster(ROSTER_LINE, "real-entry");
-    const roster = handWrittenDefaultRosterDirectory(home);
+    const { home, stateFolder } = homeWithRoster(ROSTER_LINE, "real-entry");
+    const roster = rosterFolderIn(stateFolder);
     symlinkSync(join(roster, "real-entry"), join(roster, SESSION_ID));
 
     expectSilence(runHook(compactInput(), { HOME: home }));
@@ -387,7 +437,7 @@ describe("coordinator reground hook public process", () => {
   });
 
   test("stays silent when bun is absent from PATH", () => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home } = homeWithRoster(ROSTER_LINE);
 
     expectSilence(
       runHook(compactInput(), { HOME: home, PATH: makeDirectory() }),
@@ -395,7 +445,7 @@ describe("coordinator reground hook public process", () => {
   });
 
   test("stays silent when the runtime exits non-zero", () => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home } = homeWithRoster(ROSTER_LINE);
     const fakePath = makeDirectory();
     writeFileSync(
       join(fakePath, "bun"),
@@ -407,7 +457,7 @@ describe("coordinator reground hook public process", () => {
   });
 
   test("stays silent when the logic file is missing", () => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home } = homeWithRoster(ROSTER_LINE);
     const pluginRoot = makeDirectory();
     const copiedLauncherFolder = join(pluginRoot, "hooks", "coordinator");
     mkdirSync(copiedLauncherFolder, { recursive: true });
@@ -422,47 +472,157 @@ describe("coordinator reground hook public process", () => {
   });
 });
 
-describe("coordinator reground hook roster folder", () => {
-  test("reads the roster folder named by COORDINATOR_ROSTER_DIR", () => {
+describe("coordinator reground hook state folder", () => {
+  test("defaults to agent-coordination under the HOME state folder", () => {
+    const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
+
+    expect(stateFolder).toBe(
+      join(home, ".local", "state", "agent-coordination"),
+    );
+    expectRegroundText(
+      runHook(compactInput(), { HOME: home }),
+      handWrittenNamedRegroundTextOracle(stateFolder),
+    );
+  });
+
+  test("stays silent for a roster entry in the old machine-specific state folder", () => {
     const home = makeDirectory();
-    const roster = makeDirectory();
-    writeRoster(roster, SESSION_ID, ROSTER_LINE);
+    writeStateRoster(join(home, ".local", "state", legacyStateFolderName));
+
+    expectSilence(runHook(compactInput(), { HOME: home }));
+  });
+
+  test("uses agent-coordination under an absolute XDG_STATE_HOME before HOME", () => {
+    const { home } = homeWithRoster(ROSTER_LINE);
+    const xdgStateHome = makeDirectory();
+    const stateFolder = join(xdgStateHome, "agent-coordination");
+    writeStateRoster(stateFolder);
 
     expectRegroundText(
-      runHook(compactInput(), { HOME: home, COORDINATOR_ROSTER_DIR: roster }),
-      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
+      runHook(compactInput(), { HOME: home, XDG_STATE_HOME: xdgStateHome }),
+      handWrittenNamedRegroundTextOracle(stateFolder),
     );
   });
 
-  test("needs no HOME when COORDINATOR_ROSTER_DIR is absolute", () => {
-    const roster = makeDirectory();
-    writeRoster(roster, SESSION_ID, ROSTER_LINE);
+  test("falls back to HOME for a relative XDG_STATE_HOME", () => {
+    const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
+    const { pluginRoot, copied } = copiedPluginLauncher();
+    const project = makeDirectory();
+    for (const base of [join(pluginRoot, "hooks", "coordinator"), project]) {
+      writeStateRoster(join(base, "relative-state", "agent-coordination"));
+    }
 
     expectRegroundText(
-      runHook(compactInput(), { COORDINATOR_ROSTER_DIR: roster }),
-      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
+      runHook(
+        compactInput(),
+        { HOME: home, XDG_STATE_HOME: "relative-state" },
+        project,
+        [systemShell, copied],
+      ),
+      handWrittenNamedRegroundTextOracle(stateFolder),
     );
   });
 
-  test("falls back to the HOME state folder for an empty COORDINATOR_ROSTER_DIR", () => {
-    const home = homeWithRoster(ROSTER_LINE);
+  test("reads the state folder named by COORDINATION_STATE_DIR before XDG_STATE_HOME and HOME", () => {
+    const { home } = homeWithRoster(ROSTER_LINE);
+    const xdgStateHome = makeDirectory();
+    writeStateRoster(join(xdgStateHome, "agent-coordination"));
+    const stateFolder = makeDirectory();
+    writeStateRoster(stateFolder);
 
     expectRegroundText(
-      runHook(compactInput(), { HOME: home, COORDINATOR_ROSTER_DIR: "" }),
-      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
+      runHook(compactInput(), {
+        HOME: home,
+        XDG_STATE_HOME: xdgStateHome,
+        COORDINATION_STATE_DIR: stateFolder,
+      }),
+      handWrittenNamedRegroundTextOracle(stateFolder),
     );
   });
 
-  test("stays silent for a relative COORDINATOR_ROSTER_DIR", () => {
-    const base = makeDirectory();
-    writeRoster(join(base, "roster"), SESSION_ID, ROSTER_LINE);
+  test("needs no HOME when COORDINATION_STATE_DIR is absolute", () => {
+    const stateFolder = makeDirectory();
+    writeStateRoster(stateFolder);
+
+    expectRegroundText(
+      runHook(compactInput(), { COORDINATION_STATE_DIR: stateFolder }),
+      handWrittenNamedRegroundTextOracle(stateFolder),
+    );
+  });
+
+  test("prints COORDINATION_STATE_DIR without its trailing slash", () => {
+    const stateFolder = makeDirectory();
+    writeStateRoster(stateFolder);
+
+    expectRegroundText(
+      runHook(compactInput(), { COORDINATION_STATE_DIR: `${stateFolder}/` }),
+      handWrittenNamedRegroundTextOracle(stateFolder),
+    );
+  });
+
+  test("falls back to the HOME state folder for an empty COORDINATION_STATE_DIR", () => {
+    const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
+
+    expectRegroundText(
+      runHook(compactInput(), { HOME: home, COORDINATION_STATE_DIR: "" }),
+      handWrittenNamedRegroundTextOracle(stateFolder),
+    );
+  });
+
+  test("stays silent for a relative COORDINATION_STATE_DIR", () => {
+    const { home } = homeWithRoster(ROSTER_LINE);
+    const { pluginRoot, copied } = copiedPluginLauncher();
+    const project = makeDirectory();
+    for (const base of [join(pluginRoot, "hooks", "coordinator"), project]) {
+      writeStateRoster(join(base, "relative-state"));
+    }
 
     expectSilence(
       runHook(
         compactInput(),
-        { HOME: base, COORDINATOR_ROSTER_DIR: "roster" },
-        base,
+        { HOME: home, COORDINATION_STATE_DIR: "relative-state" },
+        project,
+        [systemShell, copied],
       ),
+    );
+  });
+
+  test("stays silent for a COORDINATION_STATE_DIR longer than 256 characters", () => {
+    const { home } = homeWithRoster(ROSTER_LINE);
+    const stateFolder = stateFolderOfLength(stateFolderLengthLimit + 1);
+    writeStateRoster(stateFolder);
+
+    expect(stateFolder).toHaveLength(stateFolderLengthLimit + 1);
+    expectSilence(
+      runHook(compactInput(), {
+        HOME: home,
+        COORDINATION_STATE_DIR: stateFolder,
+      }),
+    );
+  });
+
+  test("stays silent for a COORDINATION_STATE_DIR holding a newline", () => {
+    const { home } = homeWithRoster(ROSTER_LINE);
+    const stateFolder = join(makeDirectory(), "two\nlines");
+    writeStateRoster(stateFolder);
+
+    expectSilence(
+      runHook(compactInput(), {
+        HOME: home,
+        COORDINATION_STATE_DIR: stateFolder,
+      }),
+    );
+  });
+
+  test("keeps the line under the byte limit for a 256-character state folder and the longest folder name", () => {
+    const longestFolder = `a${"b".repeat(63)}`;
+    const stateFolder = stateFolderOfLength(stateFolderLengthLimit);
+    writeStateRoster(stateFolder, `${longestFolder}\n`);
+
+    expect(stateFolder).toHaveLength(stateFolderLengthLimit);
+    expectRegroundText(
+      runHook(compactInput(), { COORDINATION_STATE_DIR: stateFolder }),
+      handWrittenNamedRegroundTextOracle(stateFolder, longestFolder),
     );
   });
 });
@@ -486,33 +646,33 @@ describe("coordinator reground hook plugin declaration", () => {
   });
 
   test("the declared command regrounds from the repository root", () => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
 
     expectRegroundText(
       runDeclaredCommand(repositoryRoot, { HOME: home }),
-      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
+      handWrittenNamedRegroundTextOracle(stateFolder),
     );
   });
 
   test("the declared command regrounds from a copied plugin with no executable bits", () => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
     const pluginRoot = makeDirectory();
     copyPluginWithoutExecutableBits(pluginRoot);
 
     expectRegroundText(
       runDeclaredCommand(pluginRoot, { HOME: home }),
-      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
+      handWrittenNamedRegroundTextOracle(stateFolder),
     );
   });
 
   test("the declared command regrounds from a plugin root with a space in its path", () => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
     const pluginRoot = join(makeDirectory(), "plugin root");
     copyPluginWithoutExecutableBits(pluginRoot);
 
     expectRegroundText(
       runDeclaredCommand(pluginRoot, { HOME: home }),
-      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
+      handWrittenNamedRegroundTextOracle(stateFolder),
     );
   });
 });
@@ -546,32 +706,48 @@ function projectWithStdoutPreload(): { project: string; marker: string } {
   return { project, marker };
 }
 
-function projectWithEnvFile(): { project: string; envRoster: string } {
+function projectWithEnvFile(): { project: string; envStateFolder: string } {
   const project = makeDirectory();
-  const envRoster = makeDirectory();
+  const envStateFolder = makeDirectory();
   const envHome = makeDirectory();
   writeFileSync(
     join(project, ".env"),
-    `COORDINATOR_ROSTER_DIR=${envRoster}\nHOME=${envHome}\n`,
+    `COORDINATION_STATE_DIR=${envStateFolder}\nHOME=${envHome}\n`,
   );
-  return { project, envRoster };
+  return { project, envStateFolder };
+}
+
+function projectWithPlantedBun(): { project: string; marker: string } {
+  const project = makeDirectory();
+  const marker = join(project, "planted-bun-ran");
+  const plantedBun = [
+    "#!/bin/sh",
+    `printf ran > ${JSON.stringify(marker)}`,
+    "echo PROJECT BUN STDOUT",
+    "",
+  ].join("\n");
+  for (const folder of [join(project, "node_modules", ".bin"), project]) {
+    mkdirSync(folder, { recursive: true });
+    writeFileSync(join(folder, "bun"), plantedBun, { mode: 0o755 });
+  }
+  return { project, marker };
 }
 
 describe("coordinator reground hook ignores the session's project folder", () => {
   test("works when run by a relative path", () => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
 
     expectRegroundText(
       runHook(compactInput(), { HOME: home }, repositoryRoot, [
         systemShell,
         join("hooks", "coordinator", launcherName),
       ]),
-      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
+      handWrittenNamedRegroundTextOracle(stateFolder),
     );
   });
 
   test("a project bunfig.toml preload never runs for a session not on the roster", () => {
-    const home = homeWithRoster(ROSTER_LINE, "some-other-session");
+    const { home } = homeWithRoster(ROSTER_LINE, "some-other-session");
     const { project, marker } = projectWithStdoutPreload();
 
     expectSilence(runHook(compactInput(), { HOME: home }, project));
@@ -579,31 +755,66 @@ describe("coordinator reground hook ignores the session's project folder", () =>
   });
 
   test("a project bunfig.toml preload never runs for a rostered session", () => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
     const { project, marker } = projectWithStdoutPreload();
 
     expectRegroundText(
       runHook(compactInput(), { HOME: home }, project),
-      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
+      handWrittenNamedRegroundTextOracle(stateFolder),
     );
     expect(existsSync(marker)).toBe(false);
   });
 
   test("a project .env cannot silence a rostered session", () => {
-    const home = homeWithRoster(ROSTER_LINE);
+    const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
     const { project } = projectWithEnvFile();
 
     expectRegroundText(
       runHook(compactInput(), { HOME: home }, project),
-      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
+      handWrittenNamedRegroundTextOracle(stateFolder),
     );
   });
 
   test("a project .env cannot put a session not on the roster onto it", () => {
     const home = makeDirectory();
-    const { project, envRoster } = projectWithEnvFile();
-    writeRoster(envRoster, SESSION_ID, ROSTER_LINE);
+    const { project, envStateFolder } = projectWithEnvFile();
+    writeStateRoster(envStateFolder);
 
     expectSilence(runHook(compactInput(), { HOME: home }, project));
   });
+
+  test.each(["node_modules/.bin", "."])(
+    "a project bun reached through the relative PATH entry %s never runs for a session not on the roster",
+    (relativeEntry) => {
+      const { home } = homeWithRoster(ROSTER_LINE, "some-other-session");
+      const { project, marker } = projectWithPlantedBun();
+
+      expectSilence(
+        runHook(
+          compactInput(),
+          { HOME: home, PATH: `${relativeEntry}:${bunDirectory}` },
+          project,
+        ),
+      );
+      expect(existsSync(marker)).toBe(false);
+    },
+  );
+
+  test.each(["node_modules/.bin", "."])(
+    "a project bun reached through the relative PATH entry %s never runs for a rostered session",
+    (relativeEntry) => {
+      const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
+      const { project, marker } = projectWithPlantedBun();
+
+      expectRegroundText(
+        runHook(
+          compactInput(),
+          { HOME: home, PATH: `${relativeEntry}:${bunDirectory}` },
+          project,
+        ),
+        handWrittenNamedRegroundTextOracle(stateFolder),
+      );
+      expect(existsSync(marker)).toBe(false);
+    },
+  );
 });

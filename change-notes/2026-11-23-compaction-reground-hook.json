@@ -2,6 +2,6 @@
   "kind": "added",
   "breaking": false,
   "affects": ["claude-code-plugin", "hooks"],
-  "summary": "Added a Claude Code SessionStart hook to the plugin that puts a short reground note back into a registered coordinator session's context after compaction, and stays silent for every other session.",
-  "action": "To opt a coordinator session in, write its roster entry as the README's Hooks section shows; the hook needs bun on PATH."
+  "summary": "Added a Claude Code SessionStart hook to the plugin that puts a short reground note back into a registered coordinator session's context after compaction, and stays silent for every other session. The hook reads its roster from the state folder set by COORDINATION_STATE_DIR, which defaults to $XDG_STATE_HOME/agent-coordination or $HOME/.local/state/agent-coordination.",
+  "action": "To opt a coordinator session in, write its roster entry under <state folder>/coordinator-roster as the README's Hooks section shows. Set COORDINATION_STATE_DIR in the environment Claude Code starts with to move the state folder. The hook needs bun on PATH."
 }

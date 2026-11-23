@@ -1,39 +1,60 @@
 import { closeSync, lstatSync, openSync, readSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 
-const ROSTER_DIRECTORY_VARIABLE = "COORDINATOR_ROSTER_DIR";
+const STATE_FOLDER_VARIABLE = "COORDINATION_STATE_DIR";
+const STATE_FOLDER_NAME = "agent-coordination";
+const STATE_FOLDER_MAX_LENGTH = 256;
+const CONTROL_CHARACTER_PATTERN = /\p{Cc}/u;
+const ROSTER_FOLDER_NAME = "coordinator-roster";
 const ROSTER_HEAD_BYTES = 256;
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 const COORDINATOR_FOLDER_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
-function regroundText(folder: string | null): string {
+function regroundText(stateFolder: string, folder: string | null): string {
+  const [registration, unitState] =
+    folder === null
+      ? ["", `your coordinator folder under ${stateFolder}/`]
+      : [` (${folder})`, `${stateFolder}/${folder}/`];
+
   return [
-    `Coordinator reground: your context was just compacted. This session is registered as a kernel-split coordinator${folder === null ? "" : ` (${folder})`}.`,
+    `Coordinator reground: your context was just compacted. This session is registered as a coordinator${registration}.`,
     "",
     "Do no merge, push, post or other gated act until all four steps are done:",
-    "1. Reread ~/.local/state/kernel-split/STANDING-ORDERS.md and ~/.local/state/kernel-split/WORKING-INSTRUCTIONS.md in full.",
-    `2. Reread your own unit state in ${folder === null ? "your coordinator folder under ~/.local/state/kernel-split/" : `~/.local/state/kernel-split/${folder}/`} and the last rows of its decisions.tsv.`,
+    `1. Reread the standing orders and the working instructions in ${stateFolder} in full.`,
+    `2. Reread your own unit state in ${unitState} and the last rows of its decisions.tsv.`,
     "3. Confirm each unit against GitHub and git. The summary above is a note, not proof.",
     "4. Send the Super Coordinator one message with your rules version and each unit's state.",
   ].join("\n");
 }
 
-function rosterDirectory(): string | null {
-  const override = process.env[ROSTER_DIRECTORY_VARIABLE];
+function isUsableStateFolder(path: string): boolean {
+  return (
+    isAbsolute(path) &&
+    path.length <= STATE_FOLDER_MAX_LENGTH &&
+    !CONTROL_CHARACTER_PATTERN.test(path)
+  );
+}
 
-  if (override) {
-    return isAbsolute(override) ? override : null;
+function stateFolder(): string | null {
+  const chosen = process.env[STATE_FOLDER_VARIABLE];
+
+  if (chosen) {
+    return isUsableStateFolder(chosen) ? resolve(chosen) : null;
+  }
+
+  const xdgStateHome = process.env.XDG_STATE_HOME;
+
+  if (xdgStateHome && isAbsolute(xdgStateHome)) {
+    return join(xdgStateHome, STATE_FOLDER_NAME);
   }
 
   const home = process.env.HOME;
 
-  if (!home) {
-    return null;
+  if (home && isAbsolute(home)) {
+    return join(home, ".local", "state", STATE_FOLDER_NAME);
   }
 
-  const fallback = join(home, ".local/state/kernel-split/coordinator-roster");
-
-  return isAbsolute(fallback) ? fallback : null;
+  return null;
 }
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
@@ -90,14 +111,14 @@ function coordinatorFolder(path: string): string | null {
 }
 
 function regroundHookOutputLine(rawInput: string): string | null {
-  const directory = rosterDirectory();
+  const state = stateFolder();
   const sessionId = rosteredSessionId(rawInput);
 
-  if (!directory || !sessionId) {
+  if (!state || !sessionId) {
     return null;
   }
 
-  const entry = join(directory, sessionId);
+  const entry = join(state, ROSTER_FOLDER_NAME, sessionId);
 
   if (!lstatSync(entry).isFile()) {
     return null;
@@ -106,7 +127,7 @@ function regroundHookOutputLine(rawInput: string): string | null {
   return JSON.stringify({
     hookSpecificOutput: {
       hookEventName: "SessionStart",
-      additionalContext: regroundText(coordinatorFolder(entry)),
+      additionalContext: regroundText(state, coordinatorFolder(entry)),
     },
   });
 }
