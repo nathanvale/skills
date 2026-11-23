@@ -1,6 +1,7 @@
 {
   "author": "Nathan Vale",
   "description": "Nathan Vale's reusable agent skills with portable agent-cli-kernel CLIs.",
+  "license": "MIT",
   "name": "nathanvale-skills",
   "skills": [
     "./skills/engineering/hello-world",

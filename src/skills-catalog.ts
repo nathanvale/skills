@@ -1,3 +1,4 @@
+import { YAML } from "bun";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -157,6 +158,39 @@ export function discoverSkills(root = MODULE_ROOT): readonly SkillEntry[] {
   return entries;
 }
 
+const FRONTMATTER_OPENS_WITH_A_FIELD = /^---\r?\n[A-Za-z]/;
+
+function isYamlMapping(value: unknown): value is object {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readYamlOrNull(path: string): unknown {
+  try {
+    return YAML.parse(readFileSync(path, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function codexRefusesImplicitInvocation(document: unknown): boolean {
+  if (!isYamlMapping(document) || !Object.hasOwn(document, "policy")) {
+    return false;
+  }
+  const policy: unknown = Reflect.get(document, "policy");
+  return (
+    isYamlMapping(policy) &&
+    Object.hasOwn(policy, "allow_implicit_invocation") &&
+    Reflect.get(policy, "allow_implicit_invocation") === false
+  );
+}
+
+function codexPolicyIssue(root: string, entry: SkillEntry): string | null {
+  if (entry.invocation !== "user-invoked") return null;
+  const policyPath = join(root, entry.skillPath, "agents", "openai.yaml");
+  if (codexRefusesImplicitInvocation(readYamlOrNull(policyPath))) return null;
+  return `${entry.skillPath}: disable-model-invocation is true but Codex ignores it. Repair: add agents/openai.yaml with "policy:" and "  allow_implicit_invocation: false".`;
+}
+
 function validateSkillFiles(
   root: string,
   entries: readonly SkillEntry[],
@@ -164,11 +198,19 @@ function validateSkillFiles(
   const issues: string[] = [];
   for (const entry of entries) {
     const file = join(root, entry.skillPath, "SKILL.md");
-    const fields = parseFrontmatter(readFileSync(file, "utf8"));
+    const markdown = readFileSync(file, "utf8");
+    const fields = parseFrontmatter(markdown);
     if (fields === null) {
       issues.push(`${entry.skillPath}/SKILL.md: missing YAML frontmatter`);
       continue;
     }
+    if (!FRONTMATTER_OPENS_WITH_A_FIELD.test(markdown)) {
+      issues.push(
+        `${entry.skillPath}/SKILL.md: frontmatter must start with a field on the line after the opening "---". Repair: delete the blank line after "---".`,
+      );
+    }
+    const policyIssue = codexPolicyIssue(root, entry);
+    if (policyIssue !== null) issues.push(policyIssue);
     const declaredName = fields.get("name") ?? "";
     const description = fields.get("description") ?? "";
     if (declaredName.trim().length === 0) {

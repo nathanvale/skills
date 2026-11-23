@@ -1,0 +1,6 @@
+interface:
+  display_name: "Weekly hardening"
+  short_description: "Turn the last 7 days of mistakes into verified gates"
+  default_prompt: "Use $weekly-hardening to run this week's hardening pass as a dry run and show me the ranked table."
+policy:
+  allow_implicit_invocation: false

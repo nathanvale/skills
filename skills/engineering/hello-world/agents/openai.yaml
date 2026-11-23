@@ -1,0 +1,6 @@
+interface:
+  display_name: "Hello world"
+  short_description: "Run the bundled reference CLI"
+  default_prompt: "Use $hello-world to run its bundled CLI and greet World."
+policy:
+  allow_implicit_invocation: false
