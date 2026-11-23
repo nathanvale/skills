@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}/hooks/coordinator/compaction-reground.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
