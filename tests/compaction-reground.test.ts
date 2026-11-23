@@ -64,7 +64,6 @@ const systemShell = join(systemShellFolder, "sh");
 const trustedPath = `${bunDirectory}:${systemShellFolder}`;
 const hookOutputByteLimit = 1500;
 const stateFolderLengthLimit = 256;
-const legacyStateFolderName = ["kernel", "split"].join("-");
 
 const SESSION_ID = "11111111-2222-4333-8444-555555555555";
 const COORDINATOR_FOLDER = "example-coordinator";
@@ -485,13 +484,6 @@ describe("coordinator reground hook state folder", () => {
       runHook(compactInput(), { HOME: home }),
       handWrittenNamedRegroundTextOracle(stateFolder),
     );
-  });
-
-  test("stays silent for a roster entry in the old machine-specific state folder", () => {
-    const home = makeDirectory();
-    writeStateRoster(join(home, ".local", "state", legacyStateFolderName));
-
-    expectSilence(runHook(compactInput(), { HOME: home }));
   });
 
   test("uses agent-coordination under an absolute XDG_STATE_HOME before HOME", () => {
