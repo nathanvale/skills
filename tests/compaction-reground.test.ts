@@ -61,6 +61,7 @@ const logicRelativePath = join(
 const bunDirectory = dirname(process.execPath);
 const systemShellFolder = "/bin";
 const systemShell = join(systemShellFolder, "sh");
+const trustedPath = `${bunDirectory}:${systemShellFolder}`;
 const hookOutputByteLimit = 1500;
 const stateFolderLengthLimit = 256;
 const legacyStateFolderName = ["kernel", "split"].join("-");
@@ -247,15 +248,16 @@ function declaredCommand(): string {
 function runDeclaredCommand(
   pluginRoot: string,
   env: Record<string, string>,
+  project: string = makeDirectory(),
 ): HookResult {
   return runHook(
     compactInput(),
     {
-      PATH: `${bunDirectory}:${systemShellFolder}`,
+      PATH: trustedPath,
       CLAUDE_PLUGIN_ROOT: pluginRoot,
       ...env,
     },
-    makeDirectory(),
+    project,
     [systemShell, "-c", declaredCommand()],
   );
 }
@@ -639,7 +641,7 @@ describe("coordinator reground hook plugin declaration", () => {
       type: "command",
       timeout: 5,
     });
-    expect(declaredCommand()).toStartWith("sh ");
+    expect(declaredCommand()).toStartWith(`${systemShell} `);
     expect(declaredCommand()).toContain(
       `\${CLAUDE_PLUGIN_ROOT}/hooks/coordinator/${launcherName}`,
     );
@@ -717,18 +719,21 @@ function projectWithEnvFile(): { project: string; envStateFolder: string } {
   return { project, envStateFolder };
 }
 
-function projectWithPlantedBun(): { project: string; marker: string } {
+function projectWithPlantedExecutable(name: string): {
+  project: string;
+  marker: string;
+} {
   const project = makeDirectory();
-  const marker = join(project, "planted-bun-ran");
-  const plantedBun = [
+  const marker = join(project, `planted-${name}-ran`);
+  const planted = [
     "#!/bin/sh",
     `printf ran > ${JSON.stringify(marker)}`,
-    "echo PROJECT BUN STDOUT",
+    `echo PROJECT ${name.toUpperCase()} STDOUT`,
     "",
   ].join("\n");
   for (const folder of [join(project, "node_modules", ".bin"), project]) {
     mkdirSync(folder, { recursive: true });
-    writeFileSync(join(folder, "bun"), plantedBun, { mode: 0o755 });
+    writeFileSync(join(folder, name), planted, { mode: 0o755 });
   }
   return { project, marker };
 }
@@ -787,7 +792,7 @@ describe("coordinator reground hook ignores the session's project folder", () =>
     "a project bun reached through the relative PATH entry %s never runs for a session not on the roster",
     (relativeEntry) => {
       const { home } = homeWithRoster(ROSTER_LINE, "some-other-session");
-      const { project, marker } = projectWithPlantedBun();
+      const { project, marker } = projectWithPlantedExecutable("bun");
 
       expectSilence(
         runHook(
@@ -804,12 +809,47 @@ describe("coordinator reground hook ignores the session's project folder", () =>
     "a project bun reached through the relative PATH entry %s never runs for a rostered session",
     (relativeEntry) => {
       const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
-      const { project, marker } = projectWithPlantedBun();
+      const { project, marker } = projectWithPlantedExecutable("bun");
 
       expectRegroundText(
         runHook(
           compactInput(),
           { HOME: home, PATH: `${relativeEntry}:${bunDirectory}` },
+          project,
+        ),
+        handWrittenNamedRegroundTextOracle(stateFolder),
+      );
+      expect(existsSync(marker)).toBe(false);
+    },
+  );
+
+  test.each(["node_modules/.bin", "."])(
+    "the declared command never runs a project sh reached through the relative PATH entry %s for a session not on the roster",
+    (relativeEntry) => {
+      const { home } = homeWithRoster(ROSTER_LINE, "some-other-session");
+      const { project, marker } = projectWithPlantedExecutable("sh");
+
+      expectSilence(
+        runDeclaredCommand(
+          repositoryRoot,
+          { HOME: home, PATH: `${relativeEntry}:${trustedPath}` },
+          project,
+        ),
+      );
+      expect(existsSync(marker)).toBe(false);
+    },
+  );
+
+  test.each(["node_modules/.bin", "."])(
+    "the declared command never runs a project sh reached through the relative PATH entry %s for a rostered session",
+    (relativeEntry) => {
+      const { home, stateFolder } = homeWithRoster(ROSTER_LINE);
+      const { project, marker } = projectWithPlantedExecutable("sh");
+
+      expectRegroundText(
+        runDeclaredCommand(
+          repositoryRoot,
+          { HOME: home, PATH: `${relativeEntry}:${trustedPath}` },
           project,
         ),
         handWrittenNamedRegroundTextOracle(stateFolder),

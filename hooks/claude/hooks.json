@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/coordinator/compaction-reground.sh\"",
+            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}/hooks/coordinator/compaction-reground.sh\"",
             "timeout": 5
           }
         ]
