@@ -1,5 +1,12 @@
 import { expect, test } from "bun:test";
-import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  cpSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import {
   buildSkillClis,
@@ -202,18 +209,31 @@ test("portable skill CLI bundles match fresh builds and repository catalogs stay
   }
 });
 
-test("validate refuses a blank line after the opening front matter fence and a user-only skill without its Codex policy", () => {
-  const copy = testFolder("skills-planted-");
+function copyOfRepositoryCatalog(prefix: string): string {
+  const copy = testFolder(prefix);
+  cpSync(join(repositoryRoot(), "skills"), join(copy, "skills"), {
+    recursive: true,
+  });
+  cpSync(
+    join(repositoryRoot(), ".claude-plugin"),
+    join(copy, ".claude-plugin"),
+    { recursive: true },
+  );
+  cpSync(join(repositoryRoot(), "plugin.json"), join(copy, "plugin.json"));
+  return copy;
+}
+
+function issuesOrThrownError(root: string): readonly string[] {
   try {
-    cpSync(join(repositoryRoot(), "skills"), join(copy, "skills"), {
-      recursive: true,
-    });
-    cpSync(
-      join(repositoryRoot(), ".claude-plugin"),
-      join(copy, ".claude-plugin"),
-      { recursive: true },
-    );
-    cpSync(join(repositoryRoot(), "plugin.json"), join(copy, "plugin.json"));
+    return validateSkillsRepository(root).issues;
+  } catch (error) {
+    return [`threw ${String(error)}`];
+  }
+}
+
+test("validate refuses a blank line after the opening front matter fence and a user-only skill without its Codex policy", () => {
+  const copy = copyOfRepositoryCatalog("skills-planted-");
+  try {
     expect(validateSkillsRepository(copy).issues).toEqual([]);
 
     const skillFile = join(
@@ -230,6 +250,64 @@ test("validate refuses a blank line after the opening front matter fence and a u
       'skills/engineering/hello-world: disable-model-invocation is true but Codex ignores it. Repair: add agents/openai.yaml with "policy:" and "  allow_implicit_invocation: false".',
       'skills/engineering/weekly-hardening/SKILL.md: frontmatter must start with a field on the line after the opening "---". Repair: delete the blank line after "---".',
     ]);
+  } finally {
+    rmSync(copy, { recursive: true, force: true });
+  }
+});
+
+test("validate accepts a user-only skill only when Codex reads allow_implicit_invocation false under a top-level policy mapping", () => {
+  const copy = copyOfRepositoryCatalog("skills-codex-policy-");
+  const policyFile = join(
+    copy,
+    "skills/engineering/hello-world/agents/openai.yaml",
+  );
+  const refusal =
+    'skills/engineering/hello-world: disable-model-invocation is true but Codex ignores it. Repair: add agents/openai.yaml with "policy:" and "  allow_implicit_invocation: false".';
+  const plantedPolicies: Readonly<Record<string, string>> = {
+    "key at top level": "allow_implicit_invocation: false\n",
+    "key under interface while policy says true":
+      "interface:\n  allow_implicit_invocation: false\npolicy:\n  allow_implicit_invocation: true\n",
+    "policy nested under another parent":
+      "interface:\n  policy:\n    allow_implicit_invocation: false\n",
+    "text inside a block scalar while policy says true":
+      "interface:\n  default_prompt: |\n    allow_implicit_invocation: false\npolicy:\n  allow_implicit_invocation: true\n",
+    "text only inside a block scalar":
+      "interface:\n  default_prompt: |\n    allow_implicit_invocation: false\n",
+    "text only inside a comment":
+      "policy:\n  # allow_implicit_invocation: false\n",
+    "quoted string false": 'policy:\n  allow_implicit_invocation: "false"\n',
+    "broken YAML": "policy:\n  allow_implicit_invocation: [false\n",
+    "trailing comment after false":
+      "policy:\n  allow_implicit_invocation: false # manual only\n",
+  };
+  try {
+    const outcomes: Record<string, readonly string[]> = {};
+    for (const [label, contents] of Object.entries(plantedPolicies)) {
+      writeFileSync(policyFile, contents);
+      outcomes[label] = issuesOrThrownError(copy);
+    }
+
+    chmodSync(policyFile, 0o000);
+    outcomes["unreadable file"] = issuesOrThrownError(copy);
+    chmodSync(policyFile, 0o644);
+
+    rmSync(policyFile);
+    mkdirSync(policyFile);
+    outcomes["folder in place of the file"] = issuesOrThrownError(copy);
+
+    expect(outcomes).toEqual({
+      "key at top level": [refusal],
+      "key under interface while policy says true": [refusal],
+      "policy nested under another parent": [refusal],
+      "text inside a block scalar while policy says true": [refusal],
+      "text only inside a block scalar": [refusal],
+      "text only inside a comment": [refusal],
+      "quoted string false": [refusal],
+      "broken YAML": [refusal],
+      "trailing comment after false": [],
+      "unreadable file": [refusal],
+      "folder in place of the file": [refusal],
+    });
   } finally {
     rmSync(copy, { recursive: true, force: true });
   }
