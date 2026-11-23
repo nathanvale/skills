@@ -9,6 +9,13 @@ const ROSTER_FOLDER_NAME = "coordinator-roster";
 const ROSTER_HEAD_BYTES = 256;
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 const COORDINATOR_FOLDER_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+const SUPER_COORDINATOR_FOLDER = "super-coordinator";
+
+function reportStep(folder: string | null): string {
+  return folder === SUPER_COORDINATOR_FOLDER
+    ? "4. Write your rules version and each unit's state in STATE.md."
+    : "4. Send the Super Coordinator one message with your rules version and each unit's state.";
+}
 
 function regroundText(stateFolder: string, folder: string | null): string {
   const [registration, unitState] =
@@ -23,7 +30,7 @@ function regroundText(stateFolder: string, folder: string | null): string {
     `1. Reread the standing orders and the working instructions in ${stateFolder} in full.`,
     `2. Reread your own unit state in ${unitState} and the last rows of its decisions.tsv.`,
     "3. Confirm each unit against GitHub and git. The summary above is a note, not proof.",
-    "4. Send the Super Coordinator one message with your rules version and each unit's state.",
+    reportStep(folder),
     "If a message arrives before step 4, say in one line that you are regrounding, finish steps 1 and 2, then act on it.",
   ].join("\n");
 }
