@@ -9,6 +9,7 @@ import {
 import {
   chmodSync,
   copyFileSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   rmSync,
@@ -496,19 +497,113 @@ describe("coordinator reground hook plugin declaration", () => {
   test("the declared command regrounds from a copied plugin with no executable bits", () => {
     const home = homeWithRoster(ROSTER_LINE);
     const pluginRoot = makeDirectory();
-    for (const relative of [
-      join("hooks", "coordinator", launcherName),
-      logicRelativePath,
-    ]) {
-      const copy = join(pluginRoot, relative);
-      mkdirSync(dirname(copy), { recursive: true });
-      copyFileSync(join(repositoryRoot, relative), copy);
-      chmodSync(copy, 0o644);
-    }
+    copyPluginWithoutExecutableBits(pluginRoot);
 
     expectRegroundText(
       runDeclaredCommand(pluginRoot, { HOME: home }),
       HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
     );
+  });
+
+  test("the declared command regrounds from a plugin root with a space in its path", () => {
+    const home = homeWithRoster(ROSTER_LINE);
+    const pluginRoot = join(makeDirectory(), "plugin root");
+    copyPluginWithoutExecutableBits(pluginRoot);
+
+    expectRegroundText(
+      runDeclaredCommand(pluginRoot, { HOME: home }),
+      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
+    );
+  });
+});
+
+function copyPluginWithoutExecutableBits(pluginRoot: string): void {
+  for (const relative of [
+    join("hooks", "coordinator", launcherName),
+    logicRelativePath,
+  ]) {
+    const copy = join(pluginRoot, relative);
+    mkdirSync(dirname(copy), { recursive: true });
+    copyFileSync(join(repositoryRoot, relative), copy);
+    chmodSync(copy, 0o644);
+  }
+}
+
+function projectWithStdoutPreload(): { project: string; marker: string } {
+  const project = makeDirectory();
+  const marker = join(project, "preload-ran");
+  writeFileSync(
+    join(project, "inject.ts"),
+    [
+      'import { writeFileSync } from "node:fs";',
+      'process.stdout.write("PROJECT PRELOAD STDOUT\\n");',
+      'process.stderr.write("PROJECT PRELOAD STDERR\\n");',
+      `writeFileSync(${JSON.stringify(marker)}, "ran");`,
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(join(project, "bunfig.toml"), 'preload = ["./inject.ts"]\n');
+  return { project, marker };
+}
+
+function projectWithEnvFile(): { project: string; envRoster: string } {
+  const project = makeDirectory();
+  const envRoster = makeDirectory();
+  const envHome = makeDirectory();
+  writeFileSync(
+    join(project, ".env"),
+    `COORDINATOR_ROSTER_DIR=${envRoster}\nHOME=${envHome}\n`,
+  );
+  return { project, envRoster };
+}
+
+describe("coordinator reground hook ignores the session's project folder", () => {
+  test("works when run by a relative path", () => {
+    const home = homeWithRoster(ROSTER_LINE);
+
+    expectRegroundText(
+      runHook(compactInput(), { HOME: home }, repositoryRoot, [
+        systemShell,
+        join("hooks", "coordinator", launcherName),
+      ]),
+      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
+    );
+  });
+
+  test("a project bunfig.toml preload never runs for a session not on the roster", () => {
+    const home = homeWithRoster(ROSTER_LINE, "some-other-session");
+    const { project, marker } = projectWithStdoutPreload();
+
+    expectSilence(runHook(compactInput(), { HOME: home }, project));
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  test("a project bunfig.toml preload never runs for a rostered session", () => {
+    const home = homeWithRoster(ROSTER_LINE);
+    const { project, marker } = projectWithStdoutPreload();
+
+    expectRegroundText(
+      runHook(compactInput(), { HOME: home }, project),
+      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
+    );
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  test("a project .env cannot silence a rostered session", () => {
+    const home = homeWithRoster(ROSTER_LINE);
+    const { project } = projectWithEnvFile();
+
+    expectRegroundText(
+      runHook(compactInput(), { HOME: home }, project),
+      HAND_WRITTEN_NAMED_REGROUND_TEXT_ORACLE,
+    );
+  });
+
+  test("a project .env cannot put a session not on the roster onto it", () => {
+    const home = makeDirectory();
+    const { project, envRoster } = projectWithEnvFile();
+    writeRoster(envRoster, SESSION_ID, ROSTER_LINE);
+
+    expectSilence(runHook(compactInput(), { HOME: home }, project));
   });
 });
