@@ -1,5 +1,5 @@
 import { expect, setDefaultTimeout, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runInProcess } from "agent-cli-kernel";
 import { createGoogleContactsCli } from "../src/google-contacts/cli.ts";
@@ -10,6 +10,7 @@ import {
   sampleSnapshot,
 } from "./support/google-contacts-stubs.ts";
 import { testFolder } from "./support/test-folder.ts";
+import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
 
 setDefaultTimeout(30_000);
 
@@ -203,7 +204,7 @@ test("apply covers contact-delete success/pre-delete drift, preflight failures, 
       {
         name: "timeout",
         behavior: { hangOnContact: "people/c2" },
-        timeoutMilliseconds: 1_500,
+        timeoutMilliseconds: 5_000,
       },
     ];
     for (const item of unconfirmedCases) {
@@ -249,6 +250,6 @@ test("apply covers contact-delete success/pre-delete drift, preflight failures, 
       ).causeCode,
     ).toBe("DOMAIN_CONTACTS_LEDGER_UNREADABLE");
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    removeOwnedFolder(dir);
   }
 });
