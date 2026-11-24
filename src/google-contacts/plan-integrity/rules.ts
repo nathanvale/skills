@@ -175,13 +175,13 @@ function normalizedLivePhones(
   live: readonly ContactPhone[],
   planned: readonly ContactPhone[],
 ): readonly ContactPhone[] {
-  const liveIds = new Set(live.map((p) => entryIdentity("phoneNumbers", p)));
-  const targets = planned
-    .filter((p) => !liveIds.has(entryIdentity("phoneNumbers", p)))
-    .map((p) => p.value)
-    .filter((value) => parseE164Phone(value) !== null);
+  const plannedValues = new Set(planned.map((p) => p.value));
+  const targets = [...plannedValues].filter(
+    (value) => parseE164Phone(value) !== null,
+  );
   return deduplicatePhoneList(
     live.map((phone) => {
+      if (plannedValues.has(phone.value)) return phone;
       const target = targets.find((value) =>
         phoneMatchesE164(phone.value, value),
       );
