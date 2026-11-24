@@ -5,7 +5,8 @@
   "name": "nathanvale-skills",
   "skills": [
     "./skills/engineering/hello-world",
-    "./skills/engineering/weekly-hardening"
+    "./skills/engineering/weekly-hardening",
+    "./skills/engineering/xdg"
   ],
   "version": "0.1.0"
 }

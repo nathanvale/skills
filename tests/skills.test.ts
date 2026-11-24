@@ -1,7 +1,9 @@
+import { YAML } from "bun";
 import { expect, test } from "bun:test";
 import {
   chmodSync,
   cpSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   rmSync,
@@ -55,6 +57,13 @@ test("front-door CLI lists promoted skills, validates manifests, and runs greet"
               promoted: true,
               portableCli: null,
             },
+            {
+              name: "xdg",
+              bucket: "engineering",
+              invocation: "model-invoked",
+              promoted: true,
+              portableCli: null,
+            },
           ],
         },
       },
@@ -72,7 +81,7 @@ test("front-door CLI lists promoted skills, validates manifests, and runs greet"
       result: {
         commandIdentity: "skills.validate",
         causeCode: "SUCCESS_UNCHANGED",
-        data: { valid: true, skillCount: 2, promotedCount: 2, issues: [] },
+        data: { valid: true, skillCount: 3, promotedCount: 3, issues: [] },
       },
     });
 
@@ -187,7 +196,7 @@ test("copied hello-world skill runs standalone in a sterile folder without node_
 
 test("portable skill CLI bundles match fresh builds and repository catalogs stay valid", async () => {
   expect(helloWorldContract.cli).toBe("hello-world");
-  expect(discoverSkills().length).toBe(2);
+  expect(discoverSkills().length).toBe(3);
   expect(validateSkillsRepository().valid).toBe(true);
 
   const checked = await buildSkillClis({ check: true });
@@ -310,5 +319,41 @@ test("validate accepts a user-only skill only when Codex reads allow_implicit_in
     });
   } finally {
     rmSync(copy, { recursive: true, force: true });
+  }
+});
+
+test("xdg skill is thin, model-invoked, backed by sources.md, and uses a single-line YAML scalar description", () => {
+  const skillDir = join(repositoryRoot(), "skills", "engineering", "xdg");
+  const skillFile = join(skillDir, "SKILL.md");
+  const sourcesFile = join(skillDir, "references", "sources.md");
+  expect(existsSync(skillFile)).toBe(true);
+  expect(existsSync(sourcesFile)).toBe(true);
+
+  const markdown = readFileSync(skillFile, "utf8");
+  const lineCount = markdown.trimEnd().split(/\r?\n/).length;
+  expect(lineCount).toBeLessThan(50);
+
+  const frontmatterMatch = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(
+    markdown,
+  );
+  expect(frontmatterMatch).not.toBeNull();
+  const parsed: unknown = YAML.parse(frontmatterMatch?.[1] ?? "");
+  const parsedDescription: unknown =
+    typeof parsed === "object" && parsed !== null
+      ? Reflect.get(parsed, "description")
+      : undefined;
+
+  const entry = discoverSkills().find((item) => item.name === "xdg");
+  expect(entry).toMatchObject({
+    name: "xdg",
+    bucket: "engineering",
+    invocation: "model-invoked",
+    promoted: true,
+    portableCli: null,
+  });
+  expect(typeof parsedDescription).toBe("string");
+  if (typeof parsedDescription === "string") {
+    expect(parsedDescription).not.toContain("\n");
+    expect(entry?.description).toBe(parsedDescription);
   }
 });
