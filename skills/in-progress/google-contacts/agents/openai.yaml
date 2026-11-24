@@ -1,0 +1,6 @@
+interface:
+  display_name: "Google Contacts manager"
+  short_description: "Audit, enrich, deduplicate, and safely update Google Contacts"
+  default_prompt: "Use $google-contacts to inspect readiness, audit an Account snapshot, and compile a reviewed Mutation plan."
+policy:
+  allow_implicit_invocation: false

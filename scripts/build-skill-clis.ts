@@ -11,6 +11,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export type SkillCliSpec = {
+  readonly kind?: "contract" | "runtime-factory";
   readonly name: string;
   readonly sourceModule: string;
   readonly exportName: string;
@@ -23,6 +24,13 @@ export const SKILL_CLIS: readonly SkillCliSpec[] = [
     sourceModule: "src/skill-clis/hello-world.ts",
     exportName: "helloWorldContract",
     outputFile: "skills/engineering/hello-world/dist/cli.mjs",
+  },
+  {
+    kind: "runtime-factory",
+    name: "google-contacts",
+    sourceModule: "src/google-contacts/cli.ts",
+    exportName: "createGoogleContactsCli",
+    outputFile: "skills/in-progress/google-contacts/dist/cli.mjs",
   },
 ];
 
@@ -46,12 +54,21 @@ export async function renderSkillCliBundle(
       .join("/");
     const sourcePath = resolve(root, spec.sourceModule).split("\\").join("/");
     const entryPath = join(scratch, "entry.ts");
-    const entrySource = [
-      `import { runProcess } from ${JSON.stringify(kernelEntry)};`,
-      `import { ${spec.exportName} } from ${JSON.stringify(sourcePath)};`,
-      `await runProcess(${spec.exportName})(process.argv.slice(2));`,
-      "",
-    ].join("\n");
+    const entrySource =
+      spec.kind === "runtime-factory"
+        ? [
+            `import { runProcess } from ${JSON.stringify(kernelEntry)};`,
+            `import { ${spec.exportName} } from ${JSON.stringify(sourcePath)};`,
+            `const runtime = ${spec.exportName}();`,
+            "await runProcess(runtime.contract, runtime.setup)(process.argv.slice(2));",
+            "",
+          ].join("\n")
+        : [
+            `import { runProcess } from ${JSON.stringify(kernelEntry)};`,
+            `import { ${spec.exportName} } from ${JSON.stringify(sourcePath)};`,
+            `await runProcess(${spec.exportName})(process.argv.slice(2));`,
+            "",
+          ].join("\n");
     writeFileSync(entryPath, entrySource, "utf8");
     const built = await Bun.build({
       entrypoints: [entryPath],
