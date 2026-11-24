@@ -1,0 +1,26 @@
+{
+  "schema": "verify-scenario/1",
+  "feature": "google-contacts-apply-unconfirmed",
+  "steps": [
+    {
+      "name": "apply-unconfirmed-readback",
+      "argv": [
+        "apply",
+        "--plan",
+        "{scratch}/plan-c1.json",
+        "--seal",
+        "sha256:ec2db81297b256fb7446dabc2a96d722712e7dc5ae0e388440cda034cd64999b",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 3,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.apply",
+          "causeCode": "DOMAIN_CONTACTS_APPLY_UNCONFIRMED",
+          "transactionState": "unknown"
+        }
+      }
+    }
+  ]
+}

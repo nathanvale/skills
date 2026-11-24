@@ -1,0 +1,220 @@
+{
+  "schema": "verify-scenario/1",
+  "feature": "google-contacts-read-pipeline",
+  "steps": [
+    {
+      "name": "snapshot-success",
+      "argv": ["snapshot", "--account", "owner@example.com", "--json"],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.snapshot",
+          "causeCode": "SUCCESS_UNCHANGED",
+          "data.schemaVersion": "contacts-snapshot/1"
+        }
+      }
+    },
+    {
+      "name": "audit-success",
+      "argv": ["audit", "--snapshot", "{scratch}/snap.json", "--json"],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.audit",
+          "causeCode": "SUCCESS_UNCHANGED",
+          "data.schemaVersion": "contacts-audit/1"
+        }
+      }
+    },
+    {
+      "name": "audit-invalid-input",
+      "argv": ["audit", "--snapshot", "{scratch}/bad.json", "--json"],
+      "expect": {
+        "exitCode": 4,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.audit",
+          "causeCode": "SCHEMA_INVALID_INPUT"
+        }
+      }
+    },
+    {
+      "name": "evidence-success",
+      "argv": [
+        "evidence",
+        "--snapshot",
+        "{scratch}/snap.json",
+        "--lane",
+        "gmail",
+        "--lane",
+        "web-queue",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.evidence",
+          "causeCode": "SUCCESS_UNCHANGED",
+          "data.schemaVersion": "contacts-evidence/1"
+        }
+      }
+    },
+    {
+      "name": "evidence-invalid-input",
+      "argv": ["evidence", "--snapshot", "{scratch}/bad.json", "--json"],
+      "expect": {
+        "exitCode": 4,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.evidence",
+          "causeCode": "SCHEMA_INVALID_INPUT"
+        }
+      }
+    },
+    {
+      "name": "evidence-lane-unavailable",
+      "argv": [
+        "evidence",
+        "--snapshot",
+        "{scratch}/snap.json",
+        "--lane",
+        "imsg",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 3,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.evidence",
+          "causeCode": "DOMAIN_CONTACTS_LANE_UNAVAILABLE"
+        }
+      }
+    },
+    {
+      "name": "plan-success",
+      "argv": [
+        "plan",
+        "--snapshot",
+        "{scratch}/snap.json",
+        "--lane",
+        "phone-normalize",
+        "--audit",
+        "{scratch}/audit.json",
+        "--contact",
+        "people/c1",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.plan",
+          "causeCode": "SUCCESS_UNCHANGED",
+          "data.seal": "sha256:ec2db81297b256fb7446dabc2a96d722712e7dc5ae0e388440cda034cd64999b"
+        }
+      }
+    },
+    {
+      "name": "plan-invalid-schema",
+      "argv": [
+        "plan",
+        "--snapshot",
+        "{scratch}/bad.json",
+        "--lane",
+        "phone-normalize",
+        "--audit",
+        "{scratch}/audit.json",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 4,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.plan",
+          "causeCode": "SCHEMA_INVALID_INPUT"
+        }
+      }
+    },
+    {
+      "name": "plan-invalid-domain",
+      "argv": [
+        "plan",
+        "--snapshot",
+        "{scratch}/snap.json",
+        "--lane",
+        "contact-delete",
+        "--proposals",
+        "{scratch}/unconfirmed-delete.json",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 3,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.plan",
+          "causeCode": "DOMAIN_CONTACTS_PLAN_INVALID"
+        }
+      }
+    },
+    {
+      "name": "apply-invalid-schema",
+      "argv": [
+        "apply",
+        "--plan",
+        "{scratch}/bad.json",
+        "--seal",
+        "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 4,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.apply",
+          "causeCode": "SCHEMA_INVALID_INPUT"
+        }
+      }
+    },
+    {
+      "name": "apply-invalid-plan",
+      "argv": [
+        "apply",
+        "--plan",
+        "{scratch}/forged-plan.json",
+        "--seal",
+        "sha256:5a51f419f851467708fe6f1023cc902de6bf5674c9f9c42ccc6e21ca4d8baa97",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 3,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.apply",
+          "causeCode": "DOMAIN_CONTACTS_PLAN_INVALID"
+        }
+      }
+    },
+    {
+      "name": "apply-seal-mismatch",
+      "argv": [
+        "apply",
+        "--plan",
+        "{scratch}/plan-c1.json",
+        "--seal",
+        "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 3,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.apply",
+          "causeCode": "DOMAIN_CONTACTS_SEAL_MISMATCH"
+        }
+      }
+    }
+  ]
+}

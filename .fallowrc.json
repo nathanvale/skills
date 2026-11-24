@@ -11,7 +11,8 @@
   "entry": [
     "tests/cli.test.ts",
     "tests/skills.test.ts",
-    "src/compaction-reground/compaction-reground.ts"
+    "src/compaction-reground/compaction-reground.ts",
+    "src/google-contacts/cli.ts"
   ],
   "typeAware": {
     "enabled": true,

@@ -1,0 +1,23 @@
+---
+status: accepted
+---
+
+# Disjoint Change lanes, exact-mask sub-batching, and narrow per-contact Contact ledger scopes
+
+`openclaw/gogcli`'s `contacts batch update` computes a union `updateMask` across every top-level field key present on any Contact in a batch, which silently erases omitted fields on sibling Contacts when heterogeneous patches are mixed. Meanwhile `agent-cli-kernel`'s `programsAddon` caps stdin at 1 MiB, macOS defaults `RLIMIT_NOFILE` to 256 for per-key lock file descriptors, and `stateAddon.close()` returns `unavailable` (`stopped-owner-proof-unqualified`) on macOS.
+
+We therefore enforce one disjoint `Change lane` per `Mutation plan` (`phone-normalize`, `metadata-enrich`, `note-append`, `duplicate-merge`, or `contact-delete`), partition updates into uniform `Field-mask sub-batch`es capped at 50 Contacts by default (100 hard maximum, never splitting a `Merge cluster`) and strictly under `900_000` UTF-8 bytes per stdin call, and declare a single truthful `contacts.mutate` effect on `apply`. We store the `Contact ledger` at `GOOGLE_CONTACTS_LEDGER_DIR`, `$NATHANVALE_SKILLS_DATA_HOME/google-contacts/ledger` (when absolute), `$XDG_DATA_HOME/nathanvale-skills/google-contacts/ledger` (when absolute), or `$HOME/.local/share/nathanvale-skills/google-contacts/ledger` with mode `0700` on lazy `apply` creation, scope locks narrowly per `Account:Contact`, keep `supersedeUnresolved` unset (`false`), keep a Linux `state.close` recovery command out of scope for v1.0, and read `pending` target keys and revisions from `state.history(id)`. Finally, we widen `DOMAIN_CONTACTS_APPLY_REJECTED` (`failed`, `completed`, zero `Unfinished mutation`s) to any clean non-zero `gog` failure or pre-delete drift abort at any sub-batch `k >= 0` where live non-truncated `batch get` confirms every sent update or delete target is untouched (`etag === expectedRevision`) or matches its exact planned post-state (for sent deletes, absent or still at `expectedRevision`) and confirms every unsent target was untouched by this run regardless of third-party drift or external removal.
+
+## Considered Options
+
+- **Mixed-field batch updates**: Rejected because Google People API's union `updateMask` erases untouched fields whenever two Contacts in one API call carry different top-level field sets.
+- **Account-wide `Contact ledger` lock scope**: Rejected because on macOS an interrupted mutation stays blocked until a qualified close exists, so an account-wide scope would wedge the entire address book instead of only the affected Contacts.
+- **Two declared effects (`contacts.update`, `contacts.delete`) on `apply`**: Rejected because `stateAddon`'s `observationOf()` marks any run that skips a declared effect as `partially-completed`, which would force non-delete lanes to record dishonest no-op delete effects.
+- **Enable `supersedeUnresolved: true` on `apply` (`state/DESIGN.md` section 10)**: Rejected because `DESIGN.md` section 10 matches prior unresolved cases strictly by kernel `commandIdentity` (`google-contacts.apply`), not by `Change lane`, and promises safety alongside an orphaned child process. Because `apply` runs both `etag`-checked updates and `etag`-less `batch delete`, a subsequent update run could supersede a killed delete-bearing run while an orphaned `batch delete` is still in flight.
+
+## Consequences
+
+- Clean non-zero `gog` exits at any sub-batch `k >= 0` (including pre-delete duplicate-revision drift or transient rate-limit failures inside execution) settle cleanly as `failed` and `completed` (`DOMAIN_CONTACTS_APPLY_REJECTED`) whenever live non-truncated `batch get` observes every sent update or delete target as untouched (`etag === expectedRevision`) or matching its exact planned post-state (for sent deletes, absent or still present at `expectedRevision`) and confirms every unsent update or delete target was untouched by this run (regardless of third-party `etag` drift or external removal observed via non-truncated `404`).
+- Only signals, child timeouts, missing `terminationConfirmed`, undefined `programDetails(result)`, sent-target mismatches, or failed or truncated read-backs leave narrow per-contact `Unfinished mutation`s (`DOMAIN_CONTACTS_APPLY_UNCONFIRMED`, `transactionState: "unknown"`), blocking only those Contacts until a qualified close exists.
+- A Linux `state.close` recovery command stays out of scope for v1.0.
+- Human-readable internal context (`planSeal`, `lane`, `account`) goes in `Declaration.facts` for potential `Observer` use, while `pending` reads affected `<accountKey>:<resourceName>` targets and expected `Contact revision`s offline from `state.history(id).scope.resources[].keys` and `.revisions` (`HistoryData` does not expose `facts`).

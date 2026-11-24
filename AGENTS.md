@@ -32,7 +32,10 @@ Every skill in `engineering/` or `productivity/` must appear in `.claude-plugin/
 
 ## Portable kernel skill CLIs
 
-Any skill that needs an executable `agent-cli-kernel` CLI keeps its typed TypeScript definition under `src/skill-clis/<skill>.ts` (covered by `kernelLint`, `tsc`, `bun test`, and `fallow`), registers its command on the front-door CLI in `src/commands.ts`, and compiles its zero-dependency portable bundle into `skills/<bucket>/<skill>/dist/cli.mjs` via `bun run build:skills`.
+Skills that ship an executable `agent-cli-kernel` CLI follow one of two layouts, both covered by `kernelLint`, `tsc`, `bun test`, `fallow`, and `bun run build:skills` (outputting a zero-dependency bundle to `skills/<bucket>/<skill>/dist/cli.mjs`):
+
+- **Single-file stateless skill CLI:** keeps its contract in `src/skill-clis/<skill>.ts`, registers on the stateless front-door CLI in `src/commands.ts`, and builds with `kind: "contract"` (the default) in `scripts/build-skill-clis.ts`.
+- **Multi-module or stateful standalone skill CLI (uses `state` or `programs` add-ons):** keeps its modules under `src/<skill>/` (placing pure domain rules in `src/<skill>/<area>/rules.ts`), exports a `{ contract, setup }` runtime factory from `src/<skill>/cli.ts` listed in `.fallowrc.json` `"entry"`, builds with `kind: "runtime-factory"` in `scripts/build-skill-clis.ts`, and stays off the stateless front-door `src/commands.ts`. Verify standalone bundles directly with `verify-cli` (`ready`, `sweep`, and `drive`).
 
 ## Comments
 
