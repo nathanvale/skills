@@ -64,6 +64,7 @@ export default tseslint.config(
       ".worktrees/**",
     ],
   },
+  { linterOptions: { noInlineConfig: true } },
   ...kernelLint({
     rootDir: import.meta.dirname,
     srcDir: "src",
@@ -96,6 +97,12 @@ export default tseslint.config(
       "repository/no-comments": "error",
       "repository/no-host-path-literal": "error",
     },
+  },
+  {
+    files: ["**/*.ts.txt"],
+    languageOptions: { parser: tseslint.parser },
+    plugins: { repository: repository },
+    rules: { "repository/no-comments": "error" },
   },
   {
     files: ["src/compaction-reground/compaction-reground.ts"],
