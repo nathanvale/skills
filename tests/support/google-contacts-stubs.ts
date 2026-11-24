@@ -104,6 +104,10 @@ import { dirname, join } from "node:path";
 const pidFile = join(pidDir, String(process.pid));
 writeFileSync(pidFile, String(process.pid), "utf8");
 process.on("exit", () => rmSync(pidFile, { force: true }));
+const orphaned = () => !existsSync(pidDir) || process.ppid === 1;
+setInterval(() => {
+  if (orphaned()) process.exit(137);
+}, 100).unref();
 const state = JSON.parse(readFileSync(statePath, "utf8"));
 const b = state.behavior ?? {};
 const args = process.argv.slice(2);
@@ -118,6 +122,7 @@ const waitRelease = (file) => new Promise((resolve) => {
   let w;
   let timer;
   const done = () => {
+    if (!existsSync(dirname(file))) process.exit(137);
     if (!existsSync(file)) return;
     clearInterval(timer);
     w.close();
@@ -329,6 +334,7 @@ export function createGogStub(
   initial: StubStateFile,
 ): {
   readonly binPath: string;
+  readonly pidDir: string;
   readonly statePath: string;
   readonly logPath: string;
   readonly readLog: () => readonly StubLogEntry[];
@@ -339,7 +345,7 @@ export function createGogStub(
   const logPath = join(folder, "gog-log.json");
   const pidDir = join(folder, "gog-pids");
   mkdirSync(pidDir, { recursive: true });
-  registerStub({ binPath, pidDir });
+  registerStub(pidDir);
   writeFileSync(statePath, JSON.stringify(initial), "utf8");
   writeFileSync(logPath, "[]", "utf8");
   writeFileSync(
@@ -350,6 +356,7 @@ export function createGogStub(
   chmodSync(binPath, 0o755);
   return {
     binPath,
+    pidDir,
     statePath,
     logPath,
     readLog: () => {

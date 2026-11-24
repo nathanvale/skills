@@ -1,5 +1,5 @@
 import { expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runInProcess } from "agent-cli-kernel";
 import { createGoogleContactsCli } from "../src/google-contacts/cli.ts";
@@ -11,6 +11,7 @@ import {
   sampleSnapshot,
 } from "./support/google-contacts-stubs.ts";
 import { testFolder } from "./support/test-folder.ts";
+import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
 
 setDefaultTimeout(30_000);
 
@@ -69,7 +70,7 @@ test("doctor checks readiness read-only without creating ledger dir and handles 
       ledger: { ready: false, status: "invalid-path" },
     });
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    removeOwnedFolder(dir);
   }
 });
 
@@ -184,7 +185,7 @@ test("snapshot, audit, evidence, and plan cover core read and error stations", a
       ).causeCode,
     ).toBe("TRANSIENT_NOT_STARTED");
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    removeOwnedFolder(dir);
   }
 });
 
@@ -363,6 +364,6 @@ test("apply verifies wire etag, settles clean rejections, and isolates unconfirm
       ).causeCode,
     ).toBe("DOMAIN_CONTACTS_APPLY_UNRESOLVED");
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    removeOwnedFolder(dir);
   }
 });

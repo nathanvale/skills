@@ -1,5 +1,5 @@
 import { expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runInProcess } from "agent-cli-kernel";
 import { createGoogleContactsCli } from "../src/google-contacts/cli.ts";
@@ -11,6 +11,7 @@ import {
   sampleSnapshot,
 } from "./support/google-contacts-stubs.ts";
 import { testFolder } from "./support/test-folder.ts";
+import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
 
 setDefaultTimeout(30_000);
 
@@ -169,7 +170,7 @@ test("doctor verifies all gog, imsg, and ledger readiness states without touchin
       ).data,
     ).toMatchObject({ ready: false, ledger: { ready: false } });
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    removeOwnedFolder(dir);
   }
 });
 
@@ -261,7 +262,7 @@ test("snapshot covers multi-page list, targeted batch get with missing, empty ex
       ).causeCode,
     ).toBe("TRANSIENT_NOT_STARTED");
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    removeOwnedFolder(dir);
   }
 });
 
@@ -356,6 +357,6 @@ test("audit preserves labels, skips PROFILE phones, finds duplicates/sparse/stal
       ],
     });
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    removeOwnedFolder(dir);
   }
 });

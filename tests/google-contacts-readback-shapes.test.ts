@@ -1,5 +1,5 @@
 import { expect, setDefaultTimeout, test } from "bun:test";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { ContactRecord } from "../src/google-contacts/domain/rules.ts";
 import type { GogStubBehavior } from "./support/google-contacts-stubs.ts";
@@ -12,6 +12,7 @@ import {
   runContactsCli,
 } from "./support/google-contacts-run.ts";
 import { testFolder } from "./support/test-folder.ts";
+import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
 
 setDefaultTimeout(60_000);
 
@@ -247,6 +248,6 @@ test("the read-back shape table settles every gog batch get shape to its require
       ),
     );
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeOwnedFolder(root);
   }
 });

@@ -3,7 +3,6 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
-  rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
@@ -15,6 +14,7 @@ import {
   sampleSnapshot,
 } from "./support/google-contacts-stubs.ts";
 import { testFolder } from "./support/test-folder.ts";
+import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
 
 setDefaultTimeout(30_000);
 
@@ -230,6 +230,6 @@ test("Option 1 XDG ledger enforces 0700 lazy creation, preserves existing perms,
     ).toBe("SUCCESS_COMPLETED");
     expect(statSync(preExistingLedger).mode & 0o777).toBe(beforeMode);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    removeOwnedFolder(dir);
   }
 });

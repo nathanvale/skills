@@ -1,5 +1,5 @@
 import { expect, setDefaultTimeout, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ContactRecord } from "../src/google-contacts/domain/rules.ts";
 import {
@@ -11,6 +11,7 @@ import {
   runContactsCli,
 } from "./support/google-contacts-run.ts";
 import { testFolder } from "./support/test-folder.ts";
+import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
 
 setDefaultTimeout(60_000);
 
@@ -345,6 +346,6 @@ test("every writable field and subfield survives snapshot, plan and apply on eve
     }
     expect(observed).toEqual(expected);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeOwnedFolder(root);
   }
 });

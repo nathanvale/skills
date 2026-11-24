@@ -1,5 +1,5 @@
 import { expect, setDefaultTimeout, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ContactRecord } from "../src/google-contacts/domain/rules.ts";
 import { computePlanSeal } from "../src/google-contacts/plan-types/rules.ts";
@@ -18,6 +18,7 @@ import {
   runContactsCli,
 } from "./support/google-contacts-run.ts";
 import { testFolder } from "./support/test-folder.ts";
+import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
 
 setDefaultTimeout(60_000);
 
@@ -442,6 +443,6 @@ test("apply refuses every forged plan field that gates a delete or an overwrite,
       ),
     );
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    removeOwnedFolder(root);
   }
 });

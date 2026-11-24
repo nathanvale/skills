@@ -1,5 +1,5 @@
 import { expect, setDefaultTimeout, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runInProcess } from "agent-cli-kernel";
 import { createGoogleContactsCli } from "../src/google-contacts/cli.ts";
@@ -11,6 +11,7 @@ import {
   sampleSnapshot,
 } from "./support/google-contacts-stubs.ts";
 import { testFolder } from "./support/test-folder.ts";
+import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
 
 setDefaultTimeout(30_000);
 
@@ -158,6 +159,6 @@ test("evidence verifies Gmail flags, empty exit 3, macOS imsg ready/degraded/exc
       ).causeCode,
     ).toBe("DOMAIN_CONTACTS_LANE_UNAVAILABLE");
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    removeOwnedFolder(dir);
   }
 });

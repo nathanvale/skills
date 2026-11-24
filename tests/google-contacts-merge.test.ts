@@ -1,5 +1,5 @@
 import { expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { runInProcess } from "agent-cli-kernel";
 import { createGoogleContactsCli } from "../src/google-contacts/cli.ts";
@@ -11,6 +11,7 @@ import {
   sampleSnapshot,
 } from "./support/google-contacts-stubs.ts";
 import { testFolder } from "./support/test-folder.ts";
+import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
 
 setDefaultTimeout(30_000);
 
@@ -130,7 +131,7 @@ test("duplicate-merge updates Survivor before deleting Duplicate and aborts befo
       "people/surv",
     ]);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    removeOwnedFolder(dir);
   }
 });
 
@@ -175,6 +176,6 @@ test("bundled dist/cli.mjs executes end-to-end in a sterile working directory", 
     });
     expect(existsSync(ledgerDir)).toBe(false);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    removeOwnedFolder(dir);
   }
 });

@@ -3,14 +3,13 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
-  rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { repositoryRoot } from "../src/skills-catalog/skills-catalog.ts";
 import {
-  reapTestProcesses,
+  removeOwnedFolder,
   spawnOwnedProcess,
   waitForFile,
 } from "./support/google-contacts-processes.ts";
@@ -289,7 +288,6 @@ test("sterile copied skill bundle runs full pipeline, concurrent APPLY_HELD, and
     expect(siblingC2.exitCode).toBe(0);
     expect(siblingC2.causeCode).toBe("SUCCESS_COMPLETED");
   } finally {
-    reapTestProcesses();
-    rmSync(dir, { recursive: true, force: true });
+    removeOwnedFolder(dir);
   }
 });

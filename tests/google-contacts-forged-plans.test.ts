@@ -1,5 +1,5 @@
 import { expect, setDefaultTimeout, test } from "bun:test";
-import { rmSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runInProcess } from "agent-cli-kernel";
 import { createGoogleContactsCli } from "../src/google-contacts/cli.ts";
@@ -17,6 +17,7 @@ import {
   sampleSnapshot,
 } from "./support/google-contacts-stubs.ts";
 import { testFolder } from "./support/test-folder.ts";
+import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
 
 setDefaultTimeout(30_000);
 
@@ -270,6 +271,6 @@ test("plan rejects web PII leaks and web-only high confidence; apply rejects for
     }
     expect(gog.readLog().length).toBe(0);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    removeOwnedFolder(dir);
   }
 });
