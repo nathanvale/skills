@@ -56,6 +56,10 @@ npx skills@latest add nathanvale/skills
 - **[hello-world](./skills/engineering/hello-world/SKILL.md)**: Portable reference skill backed by a bundled `agent-cli-kernel` CLI (`dist/cli.mjs`) that runs with zero `node_modules`.
 - **[weekly-hardening](./skills/engineering/weekly-hardening/SKILL.md)**: Weekly 7-day determinism pass turning recent mistakes, CI flakes, suppressions, and loop friction into verified structural gates.
 
+**Model-invoked**
+
+- **[xdg](./skills/engineering/xdg/SKILL.md)**: XDG Base Directory v0.8 rules for CLI config, data, state, cache, and runtime directories.
+
 ### Productivity
 
 None yet.

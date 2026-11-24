@@ -10,6 +10,7 @@
   "hooks": "./hooks/claude/hooks.json",
   "skills": [
     "./skills/engineering/hello-world",
-    "./skills/engineering/weekly-hardening"
+    "./skills/engineering/weekly-hardening",
+    "./skills/engineering/xdg"
   ]
 }

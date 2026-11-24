@@ -9,4 +9,4 @@ Daily code and repository hardening skills shipped in the plugin.
 
 ## Model-invoked
 
-None yet.
+- **[xdg](./xdg/SKILL.md)**: XDG Base Directory v0.8 rules for CLI config, data, state, cache, and runtime directories.
