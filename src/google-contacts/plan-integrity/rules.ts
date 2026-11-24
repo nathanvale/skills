@@ -5,6 +5,7 @@ import {
 } from "../domain/rules.ts";
 import type { ContactRecord, FieldMetadata } from "../domain/rules.ts";
 import {
+  biographyEntryWithValue,
   buildAppendedBiography,
   deriveMergedSurvivorFields,
   existingBiographyText,
@@ -205,10 +206,16 @@ function verifyNoteAgainstLive(
   const expected =
     update.appendedLine === null
       ? null
-      : buildAppendedBiography(liveBio, update.appendedLine).value;
+      : biographyEntryWithValue(
+          [contact],
+          buildAppendedBiography(liveBio, update.appendedLine).value,
+        );
   return update.existingBiography === liveBio &&
     planned.length === 1 &&
-    planned[0]?.value === expected
+    planned[0] !== undefined &&
+    expected !== null &&
+    entryIdentity("biographies", planned[0]) ===
+      entryIdentity("biographies", expected)
     ? null
     : `note-append update for ${update.resourceName} is not the live CONTACT biography with its appended line.`;
 }

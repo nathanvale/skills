@@ -44,6 +44,9 @@ const unrelated = sampleContact("u", {
 const noted = sampleContact("n", {
   biographies: [{ value: "Preserve this original note" }],
 });
+const notedHtml = sampleContact("h", {
+  biographies: [{ value: "<b>Original</b>", contentType: "TEXT_HTML" }],
+});
 const phoned = sampleContact("p", {
   phoneNumbers: [
     { value: "0491 570 403", type: "mobile" },
@@ -227,6 +230,28 @@ const ROWS: readonly ForgedRow[] = [
       })),
   },
   {
+    name: "note-append keeps the live text but rewrites the live note's content type",
+    lane: "note-append",
+    planned: [notedHtml],
+    live: [notedHtml],
+    proposal: {
+      kind: "note-append",
+      target: "people/h",
+      confidence: "high",
+      noteLine: "Appended line",
+    },
+    forge: (body) =>
+      withFirstUpdate(body, (update) => ({
+        ...update,
+        fields: {
+          biographies: (update.fields.biographies ?? []).map((bio) => ({
+            ...bio,
+            contentType: "TEXT_PLAIN",
+          })),
+        },
+      })),
+  },
+  {
     name: "duplicate-merge Survivor existingBiography claims an empty note and drops the live one",
     lane: "duplicate-merge",
     planned: MERGE_SET,
@@ -355,7 +380,7 @@ const ROWS: readonly ForgedRow[] = [
   },
 ];
 
-const EXPECTED_ROW_COUNT = 13;
+const EXPECTED_ROW_COUNT = 14;
 
 function isPlanDoc(value: unknown): value is MutationPlanDoc {
   return (
