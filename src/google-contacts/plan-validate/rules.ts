@@ -3,13 +3,15 @@ import {
   canonicalJson,
   compareCodeUnit,
   isContactOwnedMetadata,
+  ownValue,
   parseContactRevision,
-  parseE164Phone,
   parseEmailAddress,
   parseResourceName,
 } from "../domain/rules.ts";
 import type { ContactRecord } from "../domain/rules.ts";
 import { MERGE_ALLOWLIST_FIELDS } from "../merge/rules.ts";
+import { writableSubfieldKeys } from "../person-fields/rules.ts";
+import type { ContactListField } from "../person-fields/rules.ts";
 import {
   fieldMaskOf,
   HARD_MAX_CONTACTS,
@@ -117,14 +119,6 @@ function validateLaneUpdateFields(
   lane: MutationPlanDoc["lane"],
   update: PlannedContactUpdate,
 ): string | null {
-  if (lane === "phone-normalize") {
-    const bad = (update.fields.phoneNumbers ?? []).find(
-      (phone) => parseE164Phone(phone.value) === null,
-    );
-    return bad === undefined
-      ? null
-      : `phone-normalize update for ${update.resourceName} has non-E.164 phone ${bad.value}.`;
-  }
   if (lane === "note-append" || lane === "duplicate-merge") {
     return validateBiographyLaneUpdate(lane, update);
   }
@@ -388,27 +382,29 @@ export function verifyPlanSealMatch(
   return existingSeal === computed && providedSeal.trim() === computed;
 }
 
-function objectContainsPlannedFields(live: object, planned: object): boolean {
-  for (const key of Object.keys(planned)) {
-    if (key === "metadata") continue;
-    const expected: unknown = Reflect.get(planned, key);
-    if (expected === undefined) continue;
-    const actual: unknown = Object.hasOwn(live, key)
-      ? Reflect.get(live, key)
-      : undefined;
-    if (canonicalJson(actual) !== canonicalJson(expected)) return false;
-  }
-  return true;
-}
-
-function arrayFieldMatches(
-  liveItems: readonly object[],
-  plannedItems: readonly object[],
+function entryContainsPlannedFields(
+  field: ContactListField,
+  live: object,
+  planned: object,
 ): boolean {
-  return plannedItems.every((planned) =>
-    liveItems.some((live) => objectContainsPlannedFields(live, planned)),
+  return writableSubfieldKeys(field, planned).every(
+    (key) =>
+      canonicalJson(ownValue(live, key)) ===
+      canonicalJson(ownValue(planned, key)),
   );
 }
+
+const LANDED_LIST_FIELDS = [
+  "names",
+  "phoneNumbers",
+  "emailAddresses",
+  "organizations",
+  "addresses",
+  "urls",
+  "birthdays",
+  "events",
+  "relations",
+] as const;
 
 export function verifyPlannedUpdateLanded(
   live: ContactRecord,
@@ -416,20 +412,17 @@ export function verifyPlannedUpdateLanded(
 ): boolean {
   if (live.etag === update.expectedRevision) return false;
   const fields = update.fields;
-  const checks: readonly [readonly object[] | undefined, readonly object[]][] =
-    [
-      [fields.names, live.names],
-      [fields.phoneNumbers, live.phoneNumbers],
-      [fields.emailAddresses, live.emailAddresses],
-      [fields.organizations, live.organizations],
-      [fields.addresses, live.addresses],
-      [fields.urls, live.urls],
-      [fields.birthdays, live.birthdays],
-      [fields.events, live.events],
-      [fields.relations, live.relations],
-    ];
-  for (const [planned, actual] of checks) {
-    if (planned !== undefined && !arrayFieldMatches(actual, planned)) {
+  for (const field of LANDED_LIST_FIELDS) {
+    const planned: readonly object[] | undefined = fields[field];
+    const actual: readonly object[] = live[field];
+    if (
+      planned !== undefined &&
+      !planned.every((entry) =>
+        actual.some((liveEntry) =>
+          entryContainsPlannedFields(field, liveEntry, entry),
+        ),
+      )
+    ) {
       return false;
     }
   }

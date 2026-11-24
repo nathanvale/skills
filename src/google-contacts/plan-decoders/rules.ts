@@ -1,18 +1,7 @@
 import {
-  decodeAddress,
-  decodeBiography,
-  decodeBirthday,
-  decodeEmail,
-  decodeEvent,
-  decodeList,
-  decodeName,
-  decodeOrganization,
-  decodePhone,
-  decodeRelation,
   decodeSource,
   decodeStrictList,
   decodeStringList,
-  decodeUrl,
   unwrapEnvelopePayload,
 } from "../decoders/rules.ts";
 import {
@@ -33,6 +22,7 @@ import {
   decodeEvidenceItem,
   decodeSerializedAnchor,
 } from "../evidence-decoders/rules.ts";
+import { decodeRecordLists } from "../person-fields/rules.ts";
 import type {
   ContactWireFields,
   DeleteBatch,
@@ -51,52 +41,20 @@ import type {
 function decodeWireFields(raw: unknown): ContactWireFields | null {
   const obj = asObject(raw);
   if (obj === null) return null;
+  const lists = decodeRecordLists(obj);
+  if (lists === null) return null;
+  const has = (key: string): boolean => ownArray(obj, key) !== null;
   return {
-    ...(ownArray(obj, "names")
-      ? { names: decodeList(ownValue(obj, "names"), decodeName) }
-      : {}),
-    ...(ownArray(obj, "phoneNumbers")
-      ? { phoneNumbers: decodeList(ownValue(obj, "phoneNumbers"), decodePhone) }
-      : {}),
-    ...(ownArray(obj, "emailAddresses")
-      ? {
-          emailAddresses: decodeList(
-            ownValue(obj, "emailAddresses"),
-            decodeEmail,
-          ),
-        }
-      : {}),
-    ...(ownArray(obj, "addresses")
-      ? { addresses: decodeList(ownValue(obj, "addresses"), decodeAddress) }
-      : {}),
-    ...(ownArray(obj, "organizations")
-      ? {
-          organizations: decodeList(
-            ownValue(obj, "organizations"),
-            decodeOrganization,
-          ),
-        }
-      : {}),
-    ...(ownArray(obj, "biographies")
-      ? {
-          biographies: decodeList(
-            ownValue(obj, "biographies"),
-            decodeBiography,
-          ),
-        }
-      : {}),
-    ...(ownArray(obj, "urls")
-      ? { urls: decodeList(ownValue(obj, "urls"), decodeUrl) }
-      : {}),
-    ...(ownArray(obj, "birthdays")
-      ? { birthdays: decodeList(ownValue(obj, "birthdays"), decodeBirthday) }
-      : {}),
-    ...(ownArray(obj, "events")
-      ? { events: decodeList(ownValue(obj, "events"), decodeEvent) }
-      : {}),
-    ...(ownArray(obj, "relations")
-      ? { relations: decodeList(ownValue(obj, "relations"), decodeRelation) }
-      : {}),
+    ...(has("names") ? { names: lists.names } : {}),
+    ...(has("phoneNumbers") ? { phoneNumbers: lists.phoneNumbers } : {}),
+    ...(has("emailAddresses") ? { emailAddresses: lists.emailAddresses } : {}),
+    ...(has("addresses") ? { addresses: lists.addresses } : {}),
+    ...(has("organizations") ? { organizations: lists.organizations } : {}),
+    ...(has("biographies") ? { biographies: lists.biographies } : {}),
+    ...(has("urls") ? { urls: lists.urls } : {}),
+    ...(has("birthdays") ? { birthdays: lists.birthdays } : {}),
+    ...(has("events") ? { events: lists.events } : {}),
+    ...(has("relations") ? { relations: lists.relations } : {}),
   };
 }
 

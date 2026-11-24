@@ -57,24 +57,32 @@ export type FieldMetadataSource = {
 
 export type FieldMetadata = {
   readonly primary?: boolean;
+  readonly sourcePrimary?: boolean;
+  readonly verified?: boolean;
   readonly source?: FieldMetadataSource;
 };
 
 export type ContactName = {
   readonly displayName?: string;
+  readonly displayNameLastFirst?: string;
+  readonly unstructuredName?: string;
   readonly givenName?: string;
   readonly middleName?: string;
   readonly familyName?: string;
   readonly honorificPrefix?: string;
   readonly honorificSuffix?: string;
+  readonly phoneticFullName?: string;
   readonly phoneticGivenName?: string;
   readonly phoneticMiddleName?: string;
   readonly phoneticFamilyName?: string;
+  readonly phoneticHonorificPrefix?: string;
+  readonly phoneticHonorificSuffix?: string;
   readonly metadata?: FieldMetadata;
 };
 
 export type ContactPhone = {
   readonly value: string;
+  readonly canonicalForm?: string;
   readonly type?: string;
   readonly formattedType?: string;
   readonly metadata?: FieldMetadata;
@@ -82,6 +90,7 @@ export type ContactPhone = {
 
 export type ContactEmail = {
   readonly value: string;
+  readonly displayName?: string;
   readonly type?: string;
   readonly formattedType?: string;
   readonly metadata?: FieldMetadata;
@@ -89,22 +98,35 @@ export type ContactEmail = {
 
 export type ContactAddress = {
   readonly formattedValue?: string;
+  readonly poBox?: string;
   readonly streetAddress?: string;
+  readonly extendedAddress?: string;
   readonly city?: string;
   readonly region?: string;
   readonly postalCode?: string;
   readonly country?: string;
   readonly countryCode?: string;
   readonly type?: string;
+  readonly formattedType?: string;
   readonly metadata?: FieldMetadata;
 };
 
 export type ContactOrganization = {
   readonly name?: string;
+  readonly phoneticName?: string;
   readonly title?: string;
+  readonly jobDescription?: string;
   readonly department?: string;
+  readonly symbol?: string;
   readonly domain?: string;
+  readonly location?: string;
+  readonly costCenter?: string;
+  readonly fullTimeEquivalentMillipercent?: number;
+  readonly current?: boolean;
+  readonly startDate?: ContactDate;
+  readonly endDate?: ContactDate;
   readonly type?: string;
+  readonly formattedType?: string;
   readonly metadata?: FieldMetadata;
 };
 
@@ -117,6 +139,7 @@ export type ContactBiography = {
 export type ContactUrl = {
   readonly value: string;
   readonly type?: string;
+  readonly formattedType?: string;
   readonly metadata?: FieldMetadata;
 };
 
@@ -134,6 +157,7 @@ export type ContactBirthday = {
 
 export type ContactEvent = {
   readonly type?: string;
+  readonly formattedType?: string;
   readonly date?: ContactDate;
   readonly metadata?: FieldMetadata;
 };
@@ -141,6 +165,7 @@ export type ContactEvent = {
 export type ContactRelation = {
   readonly person: string;
   readonly type?: string;
+  readonly formattedType?: string;
   readonly metadata?: FieldMetadata;
 };
 

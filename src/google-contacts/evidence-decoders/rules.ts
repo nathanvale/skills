@@ -1,6 +1,5 @@
 import {
   decodeList,
-  decodePhone,
   decodeStrictList,
   decodeStringFields,
   decodeStringList,
@@ -28,6 +27,8 @@ import type {
   SerializedIdentityAnchor,
   WebResearchQueueEntry,
 } from "../domain/rules.ts";
+
+import { decodePhone } from "../person-fields/rules.ts";
 
 const AUDIT_KINDS: readonly AuditFindingKind[] = [
   "phone-normalize",

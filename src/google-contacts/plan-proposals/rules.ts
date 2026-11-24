@@ -8,12 +8,13 @@ import type {
   EvidenceItem,
 } from "../domain/rules.ts";
 import {
+  biographyEntryWithValue,
   buildAppendedBiography,
   computeDuplicateMerge,
   existingBiographyText,
   primaryContactSource,
 } from "../merge/rules.ts";
-import { normalizeContactPhones } from "../phone/rules.ts";
+import { planPhoneNormalization } from "../phone/rules.ts";
 import { fieldMaskOf } from "../plan-subbatch/rules.ts";
 import type {
   ContactWireFields,
@@ -224,7 +225,7 @@ function handleNoteProposal(
     expectedRevision: contact.etag,
     contactSource: primaryContactSource(contact),
     fields: {
-      biographies: [{ value: appended.value, contentType: "TEXT_PLAIN" }],
+      biographies: [biographyEntryWithValue([contact], appended.value)],
     },
     existingBiography: existing,
     appendedLine: line,
@@ -248,10 +249,13 @@ function handleUpdateProposal(
     return null;
   }
   if (input.lane === "phone-normalize") {
-    const owned = stripNonContactSource(
-      prop.phoneNumbers ?? contact.phoneNumbers,
+    const norm = planPhoneNormalization(
+      stripNonContactSource(contact.phoneNumbers),
+      prop.phoneNumbers !== undefined
+        ? stripNonContactSource(prop.phoneNumbers)
+        : null,
+      input.defaultRegion,
     );
-    const norm = normalizeContactPhones(owned, input.defaultRegion);
     if (norm.ambiguousValues.length > 0) {
       return `Ambiguous phone numbers on ${contact.resourceName}: ${norm.ambiguousValues.join(", ")}.`;
     }
@@ -260,7 +264,7 @@ function handleUpdateProposal(
       resourceName: contact.resourceName,
       expectedRevision: contact.etag,
       contactSource: primaryContactSource(contact),
-      fields: { phoneNumbers: norm.normalized },
+      fields: { phoneNumbers: norm.phones },
       existingBiography: null,
       appendedLine: null,
       confidence: conf,

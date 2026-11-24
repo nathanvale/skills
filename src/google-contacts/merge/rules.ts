@@ -6,7 +6,6 @@ import {
   sharedIndependentAnchors,
 } from "../anchors/rules.ts";
 import {
-  canonicalJson,
   compareCodeUnit,
   parseContactRevision,
   parseResourceName,
@@ -23,6 +22,8 @@ import type {
   IdentityAnchor,
   ResourceName,
 } from "../domain/rules.ts";
+import { entryIdentity, writableSubfieldKeys } from "../person-fields/rules.ts";
+import type { ContactListField } from "../person-fields/rules.ts";
 import { deduplicatePhoneList } from "../phone/rules.ts";
 import type {
   ContactWireFields,
@@ -78,18 +79,14 @@ export function primaryContactSource(
   return { type: "CONTACT", id: fallbackId, etag: contact.etag };
 }
 
-function dedupeByCanonical<T extends { readonly metadata?: FieldMetadata }>(
+function dedupeByIdentity<T extends { readonly metadata?: FieldMetadata }>(
+  field: ContactListField,
   items: readonly T[],
 ): readonly T[] {
   const seen = new Set<string>();
   const out: T[] = [];
   for (const item of stripNonContactSource(items)) {
-    const keyObj: Record<string, unknown> = {};
-    for (const key of Object.keys(item)) {
-      if (key === "metadata") continue;
-      keyObj[key] = Reflect.get(item, key);
-    }
-    const sig = canonicalJson(keyObj).toLowerCase();
+    const sig = entryIdentity(field, item).toLowerCase();
     if (seen.has(sig)) continue;
     seen.add(sig);
     out.push(item);
@@ -97,31 +94,27 @@ function dedupeByCanonical<T extends { readonly metadata?: FieldMetadata }>(
   return out;
 }
 
-const NAME_PARTS = [
-  "givenName",
-  "middleName",
-  "familyName",
-  "honorificPrefix",
-  "honorificSuffix",
-  "phoneticGivenName",
-  "phoneticMiddleName",
-  "phoneticFamilyName",
-] as const;
+function ownedName(contact: ContactRecord): ContactName | undefined {
+  return stripNonContactSource(contact.names)[0];
+}
 
-function hasConflictingNames(
-  survivor: ContactRecord,
-  duplicate: ContactRecord,
-): boolean {
-  const survName = stripNonContactSource(survivor.names)[0];
-  const dupName = stripNonContactSource(duplicate.names)[0];
-  if (survName === undefined || dupName === undefined) return false;
-  for (const part of NAME_PARTS) {
-    const sVal = (survName[part] ?? "").trim();
-    const dVal = (dupName[part] ?? "").trim();
+function namePart(name: ContactName, key: string): string {
+  const value: unknown = Reflect.get(name, key);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function namesConflict(left: ContactName, right: ContactName): boolean {
+  const keys = new Set([
+    ...writableSubfieldKeys("names", left),
+    ...writableSubfieldKeys("names", right),
+  ]);
+  for (const key of keys) {
+    const leftVal = namePart(left, key);
+    const rightVal = namePart(right, key);
     if (
-      sVal.length > 0 &&
-      dVal.length > 0 &&
-      sVal.toLowerCase() !== dVal.toLowerCase()
+      leftVal.length > 0 &&
+      rightVal.length > 0 &&
+      leftVal.toLowerCase() !== rightVal.toLowerCase()
     ) {
       return true;
     }
@@ -129,52 +122,86 @@ function hasConflictingNames(
   return false;
 }
 
-function firstNonEmptyNamePart(
+function hasConflictingNames(
+  survivor: ContactRecord,
+  duplicate: ContactRecord,
+): boolean {
+  const survName = ownedName(survivor);
+  const dupName = ownedName(duplicate);
+  if (survName === undefined || dupName === undefined) return false;
+  return namesConflict(survName, dupName);
+}
+
+function fillMissingNameParts(
+  current: ContactName,
   duplicates: readonly ContactRecord[],
-  part: "givenName" | "middleName",
-): string | undefined {
+): ContactName {
+  const filled: Record<string, unknown> = { ...current };
   for (const dup of duplicates) {
-    const val = stripNonContactSource(dup.names)[0]?.[part];
-    if (val !== undefined && val.trim().length > 0) return val;
+    const dupName = ownedName(dup);
+    if (dupName === undefined) continue;
+    for (const key of writableSubfieldKeys("names", dupName)) {
+      const existing: unknown = filled[key];
+      const missing =
+        existing === undefined ||
+        (typeof existing === "string" && existing.trim().length === 0);
+      if (missing) filled[key] = Reflect.get(dupName, key);
+    }
   }
-  return undefined;
+  return { ...current, ...filled };
 }
 
 function mergeSurvivorNames(
   survivor: ContactRecord,
   duplicates: readonly ContactRecord[],
 ): readonly ContactName[] | undefined {
-  const baseList = stripNonContactSource(survivor.names);
+  const survivorList = stripNonContactSource(survivor.names);
+  const baseList =
+    survivorList.length > 0
+      ? survivorList
+      : (duplicates
+          .map((dup) => stripNonContactSource(dup.names))
+          .find((list) => list.length > 0) ?? []);
   const current = baseList[0];
-  if (current === undefined) {
-    for (const dup of duplicates) {
-      const dupOwned = stripNonContactSource(dup.names);
-      if (dupOwned.length > 0) return dupOwned;
+  if (current === undefined) return undefined;
+  const filled = fillMissingNameParts(current, duplicates);
+  const unchanged =
+    survivorList.length > 0 &&
+    entryIdentity("names", filled) === entryIdentity("names", current);
+  return unchanged ? undefined : [filled, ...baseList.slice(1)];
+}
+
+function mergedNameConflicts(
+  survivor: ContactRecord,
+  duplicates: readonly ContactRecord[],
+): string | null {
+  const merged =
+    mergeSurvivorNames(survivor, duplicates)?.[0] ?? ownedName(survivor);
+  if (merged === undefined) return null;
+  for (const dup of duplicates) {
+    const dupName = ownedName(dup);
+    if (dupName !== undefined && namesConflict(merged, dupName)) {
+      return `Duplicate contact ${dup.resourceName} carries a name part that conflicts with the merged Survivor name.`;
     }
-    return undefined;
   }
-  const givenMissing = (current.givenName ?? "").trim().length === 0;
-  const middleMissing = (current.middleName ?? "").trim().length === 0;
-  const givenFill = givenMissing
-    ? firstNonEmptyNamePart(duplicates, "givenName")
-    : undefined;
-  const middleFill = middleMissing
-    ? firstNonEmptyNamePart(duplicates, "middleName")
-    : undefined;
-  if (givenFill === undefined && middleFill === undefined) return undefined;
-  return [
-    {
-      ...current,
-      ...(givenFill !== undefined ? { givenName: givenFill } : {}),
-      ...(middleFill !== undefined ? { middleName: middleFill } : {}),
-    },
-    ...baseList.slice(1),
-  ];
+  return null;
 }
 
 export function existingBiographyText(contact: ContactRecord): string {
   const owned = stripNonContactSource(contact.biographies);
   return owned[0]?.value ?? "";
+}
+
+export function biographyEntryWithValue(
+  contacts: readonly ContactRecord[],
+  value: string,
+): ContactBiography {
+  const existing = contacts
+    .map((contact) => stripNonContactSource(contact.biographies)[0])
+    .find((entry) => entry !== undefined);
+  return existing !== undefined
+    ? { ...existing, value }
+    : { value, contentType: "TEXT_PLAIN" };
 }
 
 export function buildAppendedBiography(
@@ -209,7 +236,7 @@ function buildMergedBiography(
     }
   }
   merged = buildAppendedBiography(merged, provenanceLine).value;
-  return [{ value: merged, contentType: "TEXT_PLAIN" }];
+  return [biographyEntryWithValue([survivor, ...duplicates], merged)];
 }
 
 function validateMergeDuplicates(
@@ -232,7 +259,7 @@ function validateMergeDuplicates(
       return `Conflicting name parts between survivor ${survivor.resourceName} and duplicate ${dup.resourceName}.`;
     }
   }
-  return null;
+  return mergedNameConflicts(survivor, duplicates);
 }
 
 function buildMergedFields(
@@ -245,31 +272,31 @@ function buildMergedFields(
     ...duplicates.flatMap((dup) => stripNonContactSource(dup.phoneNumbers)),
   ];
   const mergedPhones = deduplicatePhoneList(allPhones);
-  const mergedEmails = dedupeByCanonical([
+  const mergedEmails = dedupeByIdentity("emailAddresses", [
     ...survivor.emailAddresses,
     ...duplicates.flatMap((dup) => dup.emailAddresses),
   ]);
-  const mergedAddresses = dedupeByCanonical([
+  const mergedAddresses = dedupeByIdentity("addresses", [
     ...survivor.addresses,
     ...duplicates.flatMap((dup) => dup.addresses),
   ]);
-  const mergedOrgs = dedupeByCanonical([
+  const mergedOrgs = dedupeByIdentity("organizations", [
     ...survivor.organizations,
     ...duplicates.flatMap((dup) => dup.organizations),
   ]);
-  const mergedUrls = dedupeByCanonical([
+  const mergedUrls = dedupeByIdentity("urls", [
     ...survivor.urls,
     ...duplicates.flatMap((dup) => dup.urls),
   ]);
-  const mergedBirthdays = dedupeByCanonical([
+  const mergedBirthdays = dedupeByIdentity("birthdays", [
     ...survivor.birthdays,
     ...duplicates.flatMap((dup) => dup.birthdays),
   ]);
-  const mergedEvents = dedupeByCanonical([
+  const mergedEvents = dedupeByIdentity("events", [
     ...survivor.events,
     ...duplicates.flatMap((dup) => dup.events),
   ]);
-  const mergedRelations = dedupeByCanonical([
+  const mergedRelations = dedupeByIdentity("relations", [
     ...survivor.relations,
     ...duplicates.flatMap((dup) => dup.relations),
   ]);

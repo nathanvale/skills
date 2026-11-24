@@ -10,7 +10,7 @@ import type {
   EvidenceItem,
 } from "../domain/rules.ts";
 import { primaryContactSource } from "../merge/rules.ts";
-import { normalizeContactPhones } from "../phone/rules.ts";
+import { planPhoneNormalization } from "../phone/rules.ts";
 import { compileProposalsForLane } from "../plan-proposals/rules.ts";
 import type { LaneBuildOutput } from "../plan-proposals/rules.ts";
 import {
@@ -79,16 +79,19 @@ function applyPhoneAuditFinding(params: {
     params.skipped.push({ resourceName: rn, reason: "max-contacts-cap" });
     return;
   }
-  const owned = stripNonContactSource(contact.phoneNumbers);
-  const phones =
-    finding.normalizedPhones ??
-    normalizeContactPhones(owned, params.defaultRegion).normalized;
+  const phones = planPhoneNormalization(
+    stripNonContactSource(contact.phoneNumbers),
+    finding.normalizedPhones !== undefined
+      ? stripNonContactSource(finding.normalizedPhones)
+      : null,
+    params.defaultRegion,
+  ).phones;
   params.seen.add(rn);
   params.updates.push({
     resourceName: contact.resourceName,
     expectedRevision: contact.etag,
     contactSource: primaryContactSource(contact),
-    fields: { phoneNumbers: stripNonContactSource(phones) },
+    fields: { phoneNumbers: phones },
     existingBiography: null,
     appendedLine: null,
     confidence: finding.confidence,

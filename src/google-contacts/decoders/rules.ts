@@ -3,7 +3,6 @@ import {
   compareCodeUnit,
   ownArray,
   ownBoolean,
-  ownNumber,
   ownString,
   ownValue,
   parseContactRevision,
@@ -11,22 +10,11 @@ import {
   parseResourceName,
 } from "../domain/rules.ts";
 import type {
-  ContactAddress,
-  ContactBiography,
-  ContactBirthday,
-  ContactDate,
-  ContactEmail,
-  ContactEvent,
-  ContactName,
-  ContactOrganization,
-  ContactPhone,
   ContactRecord,
-  ContactRelation,
   ContactSnapshotDoc,
-  ContactUrl,
-  FieldMetadata,
   FieldMetadataSource,
 } from "../domain/rules.ts";
+import { decodeRecordLists } from "../person-fields/rules.ts";
 
 const STANDARD_CONTACT_KEYS = new Set([
   "resourceName",
@@ -71,32 +59,6 @@ export function decodeSource(raw: unknown): FieldMetadataSource | null {
   };
 }
 
-function decodeFieldMetadata(raw: unknown): FieldMetadata | undefined {
-  const obj = asObject(raw);
-  if (obj === null) return undefined;
-  const primary = ownBoolean(obj, "primary");
-  const source = decodeSource(ownValue(obj, "source"));
-  if (primary === null && source === null) return undefined;
-  return {
-    ...(primary !== null ? { primary } : {}),
-    ...(source !== null ? { source } : {}),
-  };
-}
-
-function decodeDate(raw: unknown): ContactDate | undefined {
-  const obj = asObject(raw);
-  if (obj === null) return undefined;
-  const year = ownNumber(obj, "year");
-  const month = ownNumber(obj, "month");
-  const day = ownNumber(obj, "day");
-  if (year === null && month === null && day === null) return undefined;
-  return {
-    ...(year !== null ? { year } : {}),
-    ...(month !== null ? { month } : {}),
-    ...(day !== null ? { day } : {}),
-  };
-}
-
 export function decodeStringFields(
   obj: object,
   keys: readonly string[],
@@ -107,155 +69,6 @@ export function decodeStringFields(
     if (val !== null) fields[key] = val;
   }
   return fields;
-}
-
-export function decodeName(raw: unknown): ContactName | null {
-  const obj = asObject(raw);
-  if (obj === null) return null;
-  const fields = decodeStringFields(obj, [
-    "displayName",
-    "givenName",
-    "middleName",
-    "familyName",
-    "honorificPrefix",
-    "honorificSuffix",
-    "phoneticGivenName",
-    "phoneticMiddleName",
-    "phoneticFamilyName",
-  ]);
-  const metadata = decodeFieldMetadata(ownValue(obj, "metadata"));
-  return { ...fields, ...(metadata !== undefined ? { metadata } : {}) };
-}
-
-export function decodePhone(raw: unknown): ContactPhone | null {
-  const obj = asObject(raw);
-  if (obj === null) return null;
-  const value = ownString(obj, "value");
-  if (value === null) return null;
-  const type = ownString(obj, "type");
-  const formattedType = ownString(obj, "formattedType");
-  const metadata = decodeFieldMetadata(ownValue(obj, "metadata"));
-  return {
-    value,
-    ...(type !== null ? { type } : {}),
-    ...(formattedType !== null ? { formattedType } : {}),
-    ...(metadata !== undefined ? { metadata } : {}),
-  };
-}
-
-export function decodeEmail(raw: unknown): ContactEmail | null {
-  const obj = asObject(raw);
-  if (obj === null) return null;
-  const value = ownString(obj, "value");
-  if (value === null) return null;
-  const type = ownString(obj, "type");
-  const formattedType = ownString(obj, "formattedType");
-  const metadata = decodeFieldMetadata(ownValue(obj, "metadata"));
-  return {
-    value,
-    ...(type !== null ? { type } : {}),
-    ...(formattedType !== null ? { formattedType } : {}),
-    ...(metadata !== undefined ? { metadata } : {}),
-  };
-}
-
-export function decodeAddress(raw: unknown): ContactAddress | null {
-  const obj = asObject(raw);
-  if (obj === null) return null;
-  const fields = decodeStringFields(obj, [
-    "formattedValue",
-    "streetAddress",
-    "city",
-    "region",
-    "postalCode",
-    "country",
-    "countryCode",
-    "type",
-  ]);
-  const metadata = decodeFieldMetadata(ownValue(obj, "metadata"));
-  return { ...fields, ...(metadata !== undefined ? { metadata } : {}) };
-}
-
-export function decodeOrganization(raw: unknown): ContactOrganization | null {
-  const obj = asObject(raw);
-  if (obj === null) return null;
-  const fields = decodeStringFields(obj, [
-    "name",
-    "title",
-    "department",
-    "domain",
-    "type",
-  ]);
-  const metadata = decodeFieldMetadata(ownValue(obj, "metadata"));
-  return { ...fields, ...(metadata !== undefined ? { metadata } : {}) };
-}
-
-export function decodeBiography(raw: unknown): ContactBiography | null {
-  const obj = asObject(raw);
-  if (obj === null) return null;
-  const value = ownString(obj, "value");
-  if (value === null) return null;
-  const contentType = ownString(obj, "contentType");
-  const metadata = decodeFieldMetadata(ownValue(obj, "metadata"));
-  return {
-    value,
-    ...(contentType !== null ? { contentType } : {}),
-    ...(metadata !== undefined ? { metadata } : {}),
-  };
-}
-
-export function decodeUrl(raw: unknown): ContactUrl | null {
-  const obj = asObject(raw);
-  if (obj === null) return null;
-  const value = ownString(obj, "value");
-  if (value === null) return null;
-  const type = ownString(obj, "type");
-  const metadata = decodeFieldMetadata(ownValue(obj, "metadata"));
-  return {
-    value,
-    ...(type !== null ? { type } : {}),
-    ...(metadata !== undefined ? { metadata } : {}),
-  };
-}
-
-export function decodeBirthday(raw: unknown): ContactBirthday | null {
-  const obj = asObject(raw);
-  if (obj === null) return null;
-  const text = ownString(obj, "text");
-  const date = decodeDate(ownValue(obj, "date"));
-  const metadata = decodeFieldMetadata(ownValue(obj, "metadata"));
-  return {
-    ...(text !== null ? { text } : {}),
-    ...(date !== undefined ? { date } : {}),
-    ...(metadata !== undefined ? { metadata } : {}),
-  };
-}
-
-export function decodeEvent(raw: unknown): ContactEvent | null {
-  const obj = asObject(raw);
-  if (obj === null) return null;
-  const type = ownString(obj, "type");
-  const date = decodeDate(ownValue(obj, "date"));
-  const metadata = decodeFieldMetadata(ownValue(obj, "metadata"));
-  return {
-    ...(type !== null ? { type } : {}),
-    ...(date !== undefined ? { date } : {}),
-    ...(metadata !== undefined ? { metadata } : {}),
-  };
-}
-
-export function decodeRelation(raw: unknown): ContactRelation | null {
-  const obj = asObject(raw);
-  if (obj === null) return null;
-  const person = ownString(obj, "person");
-  if (person === null) return null;
-  const type = ownString(obj, "type");
-  const metadata = decodeFieldMetadata(ownValue(obj, "metadata"));
-  return {
-    person,
-    ...(type !== null ? { type } : {}),
-    ...(metadata !== undefined ? { metadata } : {}),
-  };
 }
 
 export function decodeList<T>(
@@ -364,7 +177,8 @@ export function decodeContactRecord(raw: unknown): ContactRecord | null {
   if (resourceRaw === null || etagRaw === null) return null;
   const resource = parseResourceName(resourceRaw);
   const revision = parseContactRevision(etagRaw);
-  if (resource === null || revision === null) return null;
+  const lists = decodeRecordLists(obj);
+  if (resource === null || revision === null || lists === null) return null;
   const metaObj = asObject(ownValue(obj, "metadata"));
   const sources =
     metaObj !== null
@@ -377,19 +191,7 @@ export function decodeContactRecord(raw: unknown): ContactRecord | null {
     resourceName: resource.value,
     etag: revision.value,
     metadata: { sources },
-    names: decodeList(ownValue(obj, "names"), decodeName),
-    phoneNumbers: decodeList(ownValue(obj, "phoneNumbers"), decodePhone),
-    emailAddresses: decodeList(ownValue(obj, "emailAddresses"), decodeEmail),
-    addresses: decodeList(ownValue(obj, "addresses"), decodeAddress),
-    organizations: decodeList(
-      ownValue(obj, "organizations"),
-      decodeOrganization,
-    ),
-    biographies: decodeList(ownValue(obj, "biographies"), decodeBiography),
-    urls: decodeList(ownValue(obj, "urls"), decodeUrl),
-    birthdays: decodeList(ownValue(obj, "birthdays"), decodeBirthday),
-    events: decodeList(ownValue(obj, "events"), decodeEvent),
-    relations: decodeList(ownValue(obj, "relations"), decodeRelation),
+    ...lists,
     nonAllowlistedFields: collectNonAllowlistedFields(obj),
     updatedAt,
   };

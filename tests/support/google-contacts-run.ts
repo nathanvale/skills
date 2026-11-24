@@ -34,23 +34,16 @@ function sealOf(data: unknown): string {
     : "";
 }
 
-export async function planFromContacts(params: {
+export async function planFromSnapshotFile(params: {
   readonly dir: string;
-  readonly contacts: readonly ContactRecord[];
+  readonly snapFile: string;
   readonly lane: string;
   readonly proposals: readonly unknown[];
-  readonly extraArgs?: readonly string[];
 }): Promise<{
   readonly run: CliRun;
   readonly planFile: string;
   readonly seal: string;
 }> {
-  const snapFile = join(params.dir, "snap.json");
-  writeFileSync(
-    snapFile,
-    JSON.stringify(sampleSnapshot(params.contacts)),
-    "utf8",
-  );
   const propFile = join(params.dir, "props.json");
   writeFileSync(
     propFile,
@@ -64,16 +57,34 @@ export async function planFromContacts(params: {
   const run = await runContactsCli({ env: {} }, [
     "plan",
     "--snapshot",
-    snapFile,
+    params.snapFile,
     "--lane",
     params.lane,
     "--proposals",
     propFile,
     "--min-confidence",
     "low",
-    ...(params.extraArgs ?? []),
   ]);
   const planFile = join(params.dir, "plan.json");
   writeFileSync(planFile, JSON.stringify({ result: run }), "utf8");
   return { run, planFile, seal: sealOf(run.data) };
+}
+
+export async function planFromContacts(params: {
+  readonly dir: string;
+  readonly contacts: readonly ContactRecord[];
+  readonly lane: string;
+  readonly proposals: readonly unknown[];
+}): Promise<{
+  readonly run: CliRun;
+  readonly planFile: string;
+  readonly seal: string;
+}> {
+  const snapFile = join(params.dir, "snap.json");
+  writeFileSync(
+    snapFile,
+    JSON.stringify(sampleSnapshot(params.contacts)),
+    "utf8",
+  );
+  return planFromSnapshotFile({ ...params, snapFile });
 }

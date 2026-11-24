@@ -122,3 +122,37 @@ export function normalizeContactPhones(
     ambiguousValues,
   };
 }
+
+export function planPhoneNormalization(
+  existing: readonly ContactPhone[],
+  named: readonly ContactPhone[] | null,
+  defaultRegion: CountryCode,
+): {
+  readonly phones: readonly ContactPhone[];
+  readonly ambiguousValues: readonly string[];
+} {
+  const targets = new Set<string>();
+  const ambiguousValues: string[] = [];
+  const requested: ContactPhone[] = [];
+  for (const phone of named ?? existing) {
+    const res = normalizePhoneValue(phone.value, defaultRegion);
+    if (res.kind === "ambiguous") {
+      ambiguousValues.push(phone.value);
+      continue;
+    }
+    targets.add(res.e164.value);
+    requested.push({ ...phone, value: res.e164.value });
+  }
+  const matched = new Set<string>();
+  const rewritten = existing.map((phone) => {
+    const res = normalizePhoneValue(phone.value, defaultRegion);
+    if (res.kind === "ambiguous" || !targets.has(res.e164.value)) return phone;
+    matched.add(res.e164.value);
+    return { ...phone, value: res.e164.value };
+  });
+  const added = requested.filter((phone) => !matched.has(phone.value));
+  return {
+    phones: deduplicatePhoneList([...rewritten, ...added]),
+    ambiguousValues,
+  };
+}
