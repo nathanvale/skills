@@ -37,7 +37,7 @@ A sourced factual excerpt gathered from private correspondence or public web pag
 _Avoid_: Proof, citation, snippet, clue
 
 **Evidence lane**:
-One distinct source channel for gathering Evidence items, specifically `gmail`, optional macOS `imsg`, or `web-queue`.
+One distinct source channel for gathering Evidence items, specifically `gmail`, optional macOS `imsg`, or `web-queue`. The `web-queue` lane is off in v1.
 _Avoid_: Provider, connector, scraper, integration
 
 **Web eligibility**:
@@ -45,11 +45,11 @@ The qualification rule governing whether a Contact may be researched on the publ
 _Avoid_: Searchable, lookup-ready, enrichable
 
 **Web research queue**:
-The redacted list of public-only query anchors emitted by `evidence` for Web eligibility-approved Contacts and executed outside the CLI by the host agent harness.
+The redacted list of public-only query anchors that `evidence` emits for Web eligibility-approved Contacts. Web research is off in v1, so the list is always empty. Web research will return with a rebuilt guard.
 _Avoid_: Search batch, scrape list, lookup queue
 
 **Anchored name**:
-The personal name of a Web eligibility-approved Contact, recorded in the Mutation plan's leak guard with that Contact's organization name and domain; a web query may use the name only beside one of those anchors.
+The personal name of a Web eligibility-approved Contact, recorded in the Mutation plan's leak guard with that Contact's organization name and domain. Web research is off in v1, so no step reads the leak guard.
 _Avoid_: Safe name, public name, allowed name
 
 **Confidence tier**:

@@ -26,7 +26,7 @@ export function createEvidenceCommand(deps: EvidenceCommandDeps) {
     identity: "google-contacts.evidence",
     route: ["evidence"],
     summary:
-      "Gather read-only private Evidence items (Gmail, optional macOS imsg) and emit a redacted Web research queue.",
+      "Gather read-only private Evidence items (Gmail, optional macOS imsg). The web-queue lane is off in v1 and emits no queries.",
     input: {
       ...noInput,
       options: [
@@ -89,7 +89,7 @@ export function createEvidenceCommand(deps: EvidenceCommandDeps) {
         ...stationWords,
         commandIdentity: "google-contacts.evidence",
         causeCode: SUCCESS_UNCHANGED,
-        trigger: "Evidence collection and web-queue redaction completed.",
+        trigger: "Evidence collection completed.",
         guidance: { next: { kind: "done" } },
         repairAction: null,
         independentObservable: "google-contacts.evidence:collected",

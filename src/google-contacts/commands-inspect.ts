@@ -32,6 +32,7 @@ import { readJsonFile } from "./inputs.ts";
 import { inspectLedgerReadOnly } from "./ledger.ts";
 import type { LedgerResolution } from "./ledger.ts";
 import { resolveCountryCode } from "./phone/rules.ts";
+import { WEB_RESEARCH_OFF } from "./web-firewall/rules.ts";
 
 export type InspectCommandsDeps = {
   readonly getBoundary: () => PathBoundary;
@@ -108,9 +109,8 @@ export function createDoctorCommand(deps: InspectCommandsDeps) {
             ledger,
             webLane: {
               mode: "host-harness",
-              status: "ready",
-              detail:
-                "Public web research executes outside the CLI behind the Web eligibility firewall.",
+              status: "skipped",
+              detail: WEB_RESEARCH_OFF,
             },
           },
           effects: noEffects,

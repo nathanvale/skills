@@ -15,3 +15,7 @@ Public web enrichment is valuable for sparse Contacts, but baking HTTP clients, 
 
 - The portable CLI maintains only two external binary seams (`gog` and optional macOS `imsg`), with zero runtime network code or API key custody inside `dist/cli.mjs`.
 - Outbound stripping before `webResearchQueue` prevents CLI-generated queries from leaking private fields, while inbound detection on `plan` and `apply` catches post-query leaks on agent-recorded query strings (detecting leaked queries after search rather than intercepting host-harness HTTP calls at query time).
+
+## Status in v1
+
+Web research is off in v1. The post-query leak guard missed new personal-name variants in three review rounds, so v1 ships without it. The `web-queue` lane emits no queries. `plan` and `apply` refuse every `web` `Evidence item` with `DOMAIN_CONTACTS_PLAN_INVALID` through one check that both commands run. The leak detector is removed. Web research will return with a rebuilt guard, and this decision applies again then.

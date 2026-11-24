@@ -27,7 +27,7 @@ import type {
   ProposalsDoc,
   SkippedPlanItem,
 } from "../plan-types/rules.ts";
-import { buildLeakGuard, detectWebQueryLeak } from "../web-firewall/rules.ts";
+import { buildLeakGuard, refuseWebEvidence } from "../web-firewall/rules.ts";
 
 export type CompilePlanInput = {
   readonly snapshot: ContactSnapshotDoc;
@@ -145,24 +145,13 @@ function checkAccountsMatch(input: CompilePlanInput): string | null {
   return null;
 }
 
-function checkWebEvidenceLeaks(input: CompilePlanInput): string | null {
-  const guard = buildLeakGuard(input.snapshot.contacts);
-  for (const item of input.evidenceItems) {
-    if (item.lane !== "web") continue;
-    if (item.query === null || item.query.trim().length === 0) {
-      return `Web evidence item ${item.id} is missing its recorded query string.`;
-    }
-    const leak = detectWebQueryLeak(item.query, guard);
-    if (leak !== null) return `${item.id}: ${leak}`;
-  }
-  return null;
-}
-
 function validatePlanPreconditions(input: CompilePlanInput): string | null {
+  const webErr = refuseWebEvidence(input.evidenceItems);
+  if (webErr !== null) return webErr;
   if (input.maxContacts < 1 || input.maxContacts > HARD_MAX_CONTACTS) {
     return `maxContacts must be between 1 and ${String(HARD_MAX_CONTACTS)}.`;
   }
-  return checkAccountsMatch(input) ?? checkWebEvidenceLeaks(input);
+  return checkAccountsMatch(input);
 }
 
 function buildPlanTargets(built: LaneBuildOutput): readonly PlannedTarget[] {

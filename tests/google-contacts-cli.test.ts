@@ -111,7 +111,7 @@ test("snapshot, audit, evidence, and plan cover core read and error stations", a
       lanesStatus: {
         gmail: { status: "ready" },
         imsg: { status: "unsupported-os" },
-        webQueue: { status: "ready" },
+        webQueue: { status: "skipped" },
       },
     });
 

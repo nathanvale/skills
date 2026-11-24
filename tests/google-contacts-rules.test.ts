@@ -41,10 +41,7 @@ import {
   verifyPlanSealMatch,
 } from "../src/google-contacts/plan-validate/rules.ts";
 import {
-  buildLeakGuard,
-  buildWebResearchQueue,
   containsUntrustedSentinel,
-  detectWebQueryLeak,
   evaluateWebEligibility,
 } from "../src/google-contacts/web-firewall/rules.ts";
 import type { WebEligibility } from "../src/google-contacts/web-firewall/rules.ts";
@@ -199,7 +196,7 @@ test("identity anchors exclude free-mail domains, switchboards, and email-domain
   expect(shared[0]?.kind).toBe("email");
 });
 
-test("web eligibility firewall redacts bare names and detects leaked queries and untrusted sentinels", () => {
+test("web eligibility firewall classifies bare names and detects untrusted sentinels", () => {
   const freeMailEmail = ["morgan", "gmail.com"].join("@");
   const bareOnly = sampleContact("bare", {
     names: [{ displayName: "Morgan Bare" }],
@@ -213,10 +210,6 @@ test("web eligibility firewall redacts bare names and detects leaked queries and
     emailAddresses: [{ value: "taylor@northwind.example.org", type: "work" }],
     organizations: [{ name: "Northwind", domain: "northwind.example.org" }],
   });
-  const queue = buildWebResearchQueue([bareOnly, orgContact]);
-  expect(queue.length).toBe(1);
-  expect(queue[0]?.contactResourceName).toBe("people/org");
-
   const phoneOnly = sampleContact("phone-only", {
     names: [],
     emailAddresses: [],
@@ -256,14 +249,6 @@ test("web eligibility firewall redacts bare names and detects leaked queries and
     anchor: { kind: "org-domain" },
   });
 
-  const guard = buildLeakGuard([bareOnly, orgContact]);
-  expect(detectWebQueryLeak("call +61491570222", guard)).not.toBeNull();
-  expect(detectWebQueryLeak(`${freeMailEmail} profile`, guard)).not.toBeNull();
-  expect(detectWebQueryLeak("Morgan Bare bio", guard)).not.toBeNull();
-  expect(detectWebQueryLeak("42 Private Lane Sydney", guard)).not.toBeNull();
-  expect(
-    detectWebQueryLeak("site:northwind.example.org Taylor Org", guard),
-  ).toBeNull();
   expect(containsUntrustedSentinel("<<<EXTERNAL_UNTRUSTED_CONTENT>>>")).toBe(
     true,
   );

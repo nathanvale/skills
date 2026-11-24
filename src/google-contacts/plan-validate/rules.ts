@@ -29,7 +29,7 @@ import type {
 } from "../plan-types/rules.ts";
 import {
   containsUntrustedSentinel,
-  detectWebQueryLeak,
+  refuseWebEvidence,
 } from "../web-firewall/rules.ts";
 
 const METADATA_FIELDS = new Set([
@@ -301,6 +301,8 @@ function validateDeleteBatches(
 }
 
 function validatePlanHeaderAndEvidence(plan: MutationPlanDoc): string | null {
+  const webErr = refuseWebEvidence(plan.evidenceSummary);
+  if (webErr !== null) return webErr;
   if (parseEmailAddress(plan.account) === null) {
     return "Plan account is not a valid email address.";
   }
@@ -314,14 +316,6 @@ function validatePlanHeaderAndEvidence(plan: MutationPlanDoc): string | null {
     plan.targetCount > plan.maxContacts
   ) {
     return "Plan targetCount is out of bounds or disagrees with targets.";
-  }
-  for (const item of plan.evidenceSummary) {
-    if (item.lane !== "web") continue;
-    if (item.query === null || item.query.trim().length === 0) {
-      return `Web evidence ${item.id} is missing its recorded query string.`;
-    }
-    const leak = detectWebQueryLeak(item.query, plan.leakGuard);
-    if (leak !== null) return `${item.id}: ${leak}`;
   }
   return null;
 }

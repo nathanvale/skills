@@ -6,8 +6,8 @@ import {
 } from "../domain/rules.ts";
 import type {
   ContactRecord,
+  EvidenceItem,
   OrganizationDomain,
-  WebResearchQueueEntry,
 } from "../domain/rules.ts";
 import type { PlanLeakGuard } from "../plan-types/rules.ts";
 
@@ -138,28 +138,6 @@ export function evaluateWebEligibility(contact: ContactRecord): WebEligibility {
   return { eligible: false, reason: "private-anchor-only" };
 }
 
-export function buildWebResearchQueue(
-  contacts: readonly ContactRecord[],
-): readonly WebResearchQueueEntry[] {
-  const entries: WebResearchQueueEntry[] = [];
-  for (const contact of contacts) {
-    const eligibility = evaluateWebEligibility(contact);
-    if (!eligibility.eligible) continue;
-    const anchor = eligibility.anchor;
-    const suggestedQuery =
-      anchor.kind === "org-domain"
-        ? `site:${anchor.domain.value} ${eligibility.safeQueryTerms.filter((term) => term !== anchor.domain.value).join(" ")}`.trim()
-        : `"${anchor.displayName}" "${anchor.organization}"`;
-    entries.push({
-      contactResourceName: contact.resourceName,
-      anchorKind: anchor.kind,
-      safeQueryTerms: eligibility.safeQueryTerms,
-      suggestedQuery,
-    });
-  }
-  return entries;
-}
-
 type LeakTermSets = {
   readonly phones: Set<string>;
   readonly emails: Set<string>;
@@ -265,60 +243,16 @@ export function buildLeakGuard(
   };
 }
 
-function checkEmailLeaks(lowered: string, guard: PlanLeakGuard): string | null {
-  const emailMatches = lowered.match(EMAIL_IN_QUERY) ?? [];
-  for (const email of emailMatches) {
-    const dom = emailDomainOf(email);
-    if (
-      guard.personalEmails.includes(email) ||
-      (dom !== null && isFreeMailDomain(dom))
-    ) {
-      return "Web query leaks a personal or free-mail email address.";
-    }
-  }
-  return null;
-}
+export const WEB_RESEARCH_OFF =
+  "Web research is off in v1; it will return with a rebuilt guard.";
 
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function containsWholeTerm(text: string, term: string): boolean {
-  return new RegExp(
-    `(?<![\\p{L}\\p{N}_@.-])${escapeRegExp(term)}(?![\\p{L}\\p{N}_@-]|\\.[\\p{L}\\p{N}])`,
-    "u",
-  ).test(text);
-}
-
-export function detectWebQueryLeak(
-  query: string,
-  guard: PlanLeakGuard,
+export function refuseWebEvidence(
+  items: readonly EvidenceItem[],
 ): string | null {
-  const lowered = normalizeTerms(query);
-  const digits = query.replace(/\D/g, "");
-  if (PHONE_LIKE_IN_QUERY.test(query)) {
-    return "Web query contains a phone number pattern.";
-  }
-  if (guard.privatePhones.some((num) => digits.includes(num))) {
-    return "Web query leaks a private phone number from the snapshot.";
-  }
-  const emailLeak = checkEmailLeaks(lowered, guard);
-  if (emailLeak !== null) return emailLeak;
-  if (guard.bareNames.some((name) => lowered.includes(name))) {
-    return "Web query leaks an ineligible bare personal name.";
-  }
-  const unanchored = guard.anchoredNames.find((entry) => {
-    if (!lowered.includes(entry.name)) return false;
-    const rest = lowered.split(entry.name).join(" ");
-    return !entry.anchors.some((anchor) => containsWholeTerm(rest, anchor));
-  });
-  if (unanchored !== undefined) {
-    return "Web query names a Contact's personal name without its organization or domain anchor.";
-  }
-  if (guard.streetAddresses.some((street) => lowered.includes(street))) {
-    return "Web query leaks a residential street address.";
-  }
-  return null;
+  const web = items.find((item) => item.lane === "web");
+  return web === undefined
+    ? null
+    : `Web evidence ${web.id} is refused. ${WEB_RESEARCH_OFF}`;
 }
 
 export function containsUntrustedSentinel(text: string): boolean {

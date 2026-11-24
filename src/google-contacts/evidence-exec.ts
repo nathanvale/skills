@@ -22,7 +22,7 @@ import {
   probeImsgReadiness,
 } from "./imsg.ts";
 import type { ImsgChatRow, ImsgRuntimeConfig } from "./imsg.ts";
-import { buildWebResearchQueue } from "./web-firewall/rules.ts";
+import { WEB_RESEARCH_OFF } from "./web-firewall/rules.ts";
 
 export type EvidenceCommandDeps = {
   readonly getBoundary: () => PathBoundary;
@@ -292,14 +292,6 @@ export async function executeEvidenceCollection(params: {
     imsgStatus = iRes.status;
     for (const item of iRes.items) items.push(item);
   }
-  const wantWeb = params.lanesRequested.includes("web-queue");
-  const webResearchQueue = wantWeb ? buildWebResearchQueue(params.targets) : [];
-  const webQueueStatus: EvidenceLaneStatus = wantWeb
-    ? {
-        status: "ready",
-        detail: `Prepared ${String(webResearchQueue.length)} redacted web research query(ies).`,
-      }
-    : { status: "skipped", detail: "web-queue lane not requested." };
   return {
     kind: "ok",
     doc: {
@@ -309,10 +301,10 @@ export async function executeEvidenceCollection(params: {
       lanesStatus: {
         gmail: gmailStatus,
         imsg: imsgStatus,
-        webQueue: webQueueStatus,
+        webQueue: { status: "skipped", detail: WEB_RESEARCH_OFF },
       },
       items,
-      webResearchQueue,
+      webResearchQueue: [],
     },
   };
 }

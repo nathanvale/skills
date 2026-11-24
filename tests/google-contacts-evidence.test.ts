@@ -83,7 +83,7 @@ test("evidence verifies Gmail flags, empty exit 3, macOS imsg ready/degraded/exc
       lanesStatus: {
         gmail: { status: "ready" },
         imsg: { status: "ready" },
-        webQueue: { status: "ready" },
+        webQueue: { status: "skipped" },
       },
       items: [
         {
@@ -92,7 +92,7 @@ test("evidence verifies Gmail flags, empty exit 3, macOS imsg ready/degraded/exc
           sourceRef: "imsg:chat/chat-7/msg/m1",
         },
       ],
-      webResearchQueue: [{ contactResourceName: "people/c1" }],
+      webResearchQueue: [],
     });
     const gmailLog = emptyGog
       .readLog()

@@ -317,15 +317,15 @@ export function createPlanCommand() {
         commandIdentity: "google-contacts.plan",
         causeCode: "DOMAIN_CONTACTS_PLAN_INVALID",
         trigger:
-          "A proposal or web evidence item violates safety, merge allowlist, privacy leak, corroboration, or size invariants.",
+          "A proposal violates safety, merge allowlist, corroboration, or size invariants, or the evidence carries a web item while web research is off in v1.",
         guidance: {
           next: {
             kind: "instruction",
-            text: "Fix the offending proposal, merge allowlist violation, confirmation marker, or leaked web query and re-run plan.",
+            text: "Fix the offending proposal, merge allowlist violation or confirmation marker, or drop web evidence items, and re-run plan.",
           },
         },
         repairAction:
-          "Remove unmergeable fields, leaked web queries, or unconfirmed deletions and re-run plan.",
+          "Remove unmergeable fields, web evidence items, or unconfirmed deletions and re-run plan.",
         independentObservable: "google-contacts.plan:domain-invalid",
       }),
     ],
