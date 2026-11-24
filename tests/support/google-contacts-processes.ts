@@ -65,7 +65,8 @@ export function spawnOwnedProcess(
   return child;
 }
 
-afterEach(reapTestProcesses);
+const RUNNING_UNDER_BUN_TEST = process.env.NODE_ENV === "test";
+if (RUNNING_UNDER_BUN_TEST) afterEach(reapTestProcesses);
 for (const [signal, code] of [
   ["SIGINT", 130],
   ["SIGTERM", 143],
