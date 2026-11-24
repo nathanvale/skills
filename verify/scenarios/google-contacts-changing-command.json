@@ -9,7 +9,7 @@
         "--plan",
         "{scratch}/plan-c1.json",
         "--seal",
-        "sha256:316fe7521ce2fd89879148f6c144d300ceba49a59c75c0ca970a7e05293aaee4",
+        "sha256:ec2db81297b256fb7446dabc2a96d722712e7dc5ae0e388440cda034cd64999b",
         "--json"
       ],
       "expect": {
@@ -31,7 +31,7 @@
         "--plan",
         "{scratch}/plan-c1.json",
         "--seal",
-        "sha256:316fe7521ce2fd89879148f6c144d300ceba49a59c75c0ca970a7e05293aaee4",
+        "sha256:ec2db81297b256fb7446dabc2a96d722712e7dc5ae0e388440cda034cd64999b",
         "--json"
       ],
       "expect": {
@@ -65,7 +65,7 @@
         "--plan",
         "{scratch}/plan-hang.json",
         "--seal",
-        "sha256:551d54784f73524ada7d1e17d5074a7605735a36e6e2258d1b9d85bcbbd694b6",
+        "sha256:388a08dccbb96f9f9214d92d219e4b4117bec027959a9fb5643dd842bf88ee65",
         "--json"
       ],
       "expect": {
@@ -82,7 +82,7 @@
         "--plan",
         "{scratch}/plan-hang.json",
         "--seal",
-        "sha256:551d54784f73524ada7d1e17d5074a7605735a36e6e2258d1b9d85bcbbd694b6",
+        "sha256:388a08dccbb96f9f9214d92d219e4b4117bec027959a9fb5643dd842bf88ee65",
         "--json"
       ],
       "expect": {
@@ -117,7 +117,7 @@
         "--plan",
         "{scratch}/plan-c2.json",
         "--seal",
-        "sha256:75665e5764e67643989afda172efdb1b9dc11b465f3675bd874f39580a86158d",
+        "sha256:d1f7ff82bc99baebbe0a0b0be58262072efa26bd2dcd183378e0477679dab73c",
         "--json"
       ],
       "expect": {

@@ -21,7 +21,7 @@
         "--plan",
         "{scratch}/plan-c1.json",
         "--seal",
-        "sha256:316fe7521ce2fd89879148f6c144d300ceba49a59c75c0ca970a7e05293aaee4",
+        "sha256:ec2db81297b256fb7446dabc2a96d722712e7dc5ae0e388440cda034cd64999b",
         "--json"
       ],
       "expect": {

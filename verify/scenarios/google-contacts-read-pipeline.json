@@ -113,7 +113,7 @@
         "result": {
           "commandIdentity": "google-contacts.plan",
           "causeCode": "SUCCESS_UNCHANGED",
-          "data.seal": "sha256:316fe7521ce2fd89879148f6c144d300ceba49a59c75c0ca970a7e05293aaee4"
+          "data.seal": "sha256:ec2db81297b256fb7446dabc2a96d722712e7dc5ae0e388440cda034cd64999b"
         }
       }
     },
@@ -185,7 +185,7 @@
         "--plan",
         "{scratch}/forged-plan.json",
         "--seal",
-        "sha256:a1b7159b7caf4b82da9884b72f8e42aec939b696275c2f576cc0f27f992032f7",
+        "sha256:5a51f419f851467708fe6f1023cc902de6bf5674c9f9c42ccc6e21ca4d8baa97",
         "--json"
       ],
       "expect": {
