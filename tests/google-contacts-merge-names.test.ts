@@ -1,7 +1,14 @@
-import { expect, test } from "bun:test";
+import { expect, setDefaultTimeout, test } from "bun:test";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
 import type { ContactName } from "../src/google-contacts/domain/rules.ts";
-import { computeDuplicateMerge } from "../src/google-contacts/merge/rules.ts";
+import type { MutationPlanDoc } from "../src/google-contacts/plan-types/rules.ts";
+import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
+import { planFromContacts } from "./support/google-contacts-run.ts";
 import { sampleContact } from "./support/google-contacts-stubs.ts";
+import { testFolder } from "./support/test-folder.ts";
+
+setDefaultTimeout(60_000);
 
 const ANCHORS = {
   phoneNumbers: [{ value: "+61491570701", type: "mobile" }],
@@ -111,29 +118,83 @@ const ROWS: readonly NameRow[] = [
     duplicate: { unstructuredName: "Sam Example" },
     expected: { outcome: "refused" },
   },
+  {
+    name: "a structured name against a conflicting free-form name",
+    survivor: { givenName: "Alex", familyName: "Example" },
+    duplicate: { unstructuredName: "Completely Different Person" },
+    expected: { outcome: "refused" },
+  },
+  {
+    name: "a free-form name against a conflicting structured name",
+    survivor: { unstructuredName: "Completely Different Person" },
+    duplicate: { givenName: "Alex", familyName: "Example" },
+    expected: { outcome: "refused" },
+  },
+  {
+    name: "a structured name whose words sit inside the duplicate's free-form name",
+    survivor: { givenName: "Alex", familyName: "Example" },
+    duplicate: { unstructuredName: "Alex J. Example" },
+    expected: {
+      outcome: "merged",
+      names: [
+        {
+          givenName: "Alex",
+          familyName: "Example",
+          unstructuredName: "Alex J. Example",
+        },
+      ],
+    },
+  },
 ];
 
-function mergeOutcome(row: NameRow): NameRow["expected"] {
+function isPlanDoc(value: unknown): value is MutationPlanDoc {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Reflect.get(value, "schemaVersion") === "contacts-plan/1"
+  );
+}
+
+async function mergeOutcome(
+  dir: string,
+  row: NameRow,
+): Promise<NameRow["expected"]> {
   const survivor = sampleContact("s", { names: [row.survivor], ...ANCHORS });
   const duplicate = sampleContact("d", { names: [row.duplicate], ...ANCHORS });
-  const merged = computeDuplicateMerge({
-    survivor,
-    duplicates: [duplicate],
-    allContacts: [survivor, duplicate],
-    defaultRegion: "AU",
-    humanConfirmed: false,
-    reason: null,
+  const planned = await planFromContacts({
+    dir,
+    contacts: [survivor, duplicate],
+    lane: "duplicate-merge",
+    proposals: [
+      { kind: "duplicate-merge", target: "people/s", duplicates: ["people/d"] },
+    ],
   });
-  if (!merged.ok) return { outcome: "refused" };
-  const names = merged.survivorFields.names;
+  if (planned.run.causeCode === "DOMAIN_CONTACTS_PLAN_INVALID") {
+    return { outcome: "refused" };
+  }
+  if (!isPlanDoc(planned.run.data)) throw new Error(planned.run.message);
+  const names = planned.run.data.updateSubBatches
+    .flatMap((batch) => batch.updates)
+    .find((update) => update.resourceName === "people/s")?.fields.names;
   return names === undefined
     ? { outcome: "unchanged" }
     : { outcome: "merged", names };
 }
 
-test("merges ignore read-only display names and formatting, keep the fuller free-form name, and refuse real conflicts in writable parts", () => {
-  expect(ROWS.length).toBe(8);
-  expect(ROWS.map((row) => ({ row: row.name, ...mergeOutcome(row) }))).toEqual(
-    ROWS.map((row) => ({ row: row.name, ...row.expected })),
-  );
+test("merges ignore read-only display names and formatting, keep the fuller free-form name, and refuse real conflicts in writable parts, through plan", async () => {
+  expect(ROWS.length).toBe(11);
+  const root = testFolder("gc-merge-names-");
+  try {
+    const observed: unknown[] = [];
+    for (const [index, row] of ROWS.entries()) {
+      const dir = join(root, String(index));
+      mkdirSync(dir, { recursive: true });
+      observed.push({ row: row.name, ...(await mergeOutcome(dir, row)) });
+    }
+    expect(observed).toEqual(
+      ROWS.map((row) => ({ row: row.name, ...row.expected })),
+    );
+  } finally {
+    removeOwnedFolder(root);
+  }
 });

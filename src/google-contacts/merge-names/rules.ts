@@ -46,6 +46,29 @@ function namePartsCompatible(
   return leftTokens.join(" ") === rightTokens.join(" ");
 }
 
+const STRUCTURED_NAME_KEYS = [
+  "honorificPrefix",
+  "givenName",
+  "middleName",
+  "familyName",
+  "honorificSuffix",
+] as const;
+
+function structuredNameWords(name: ContactName): string {
+  return STRUCTURED_NAME_KEYS.map((key) => namePart(name, key)).join(" ");
+}
+
+function freeFormMatchesStructured(
+  freeForm: ContactName,
+  structured: ContactName,
+): boolean {
+  return namePartsCompatible(
+    FREE_FORM_NAME_KEY,
+    namePart(freeForm, FREE_FORM_NAME_KEY),
+    structuredNameWords(structured).trim(),
+  );
+}
+
 function namesConflict(left: ContactName, right: ContactName): boolean {
   const keys = new Set([
     ...writableSubfieldKeys("names", left),
@@ -56,7 +79,10 @@ function namesConflict(left: ContactName, right: ContactName): boolean {
       return true;
     }
   }
-  return false;
+  return (
+    !freeFormMatchesStructured(left, right) ||
+    !freeFormMatchesStructured(right, left)
+  );
 }
 
 export function hasConflictingNames(
