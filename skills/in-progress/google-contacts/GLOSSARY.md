@@ -48,6 +48,10 @@ _Avoid_: Searchable, lookup-ready, enrichable
 The redacted list of public-only query anchors emitted by `evidence` for Web eligibility-approved Contacts and executed outside the CLI by the host agent harness.
 _Avoid_: Search batch, scrape list, lookup queue
 
+**Anchored name**:
+The personal name of a Web eligibility-approved Contact, recorded in the Mutation plan's leak guard with that Contact's organization name and domain; a web query may use the name only beside one of those anchors.
+_Avoid_: Safe name, public name, allowed name
+
 **Confidence tier**:
 The classification of a proposed change (`high`, `medium`, or `low`) expressing the strength and corroboration of its supporting Evidence items.
 _Avoid_: Score, certainty, trust level
