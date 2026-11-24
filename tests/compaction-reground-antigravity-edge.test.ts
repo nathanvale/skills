@@ -184,8 +184,24 @@ function expectInjected(output: ProcessOutput, stateDir: string): void {
 }
 
 function readStoredCursor(stateDir: string): StoredCursor {
-  const cursorFile = join(stateDir, "compaction-cursors", CONVERSATION_ID);
-  return JSON.parse(readFileSync(cursorFile, "utf8")) as StoredCursor;
+  const path = join(stateDir, "compaction-cursors", CONVERSATION_ID);
+  const raw: unknown = JSON.parse(readFileSync(path, "utf8"));
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw))
+    throw new Error(`Expected cursor object in ${path}`);
+  const lastCheckpointStep: unknown = Reflect.get(raw, "lastCheckpointStep");
+  const lastScannedBytes: unknown = Reflect.get(raw, "lastScannedBytes");
+  const prefixSha256: unknown = Reflect.get(raw, "prefixSha256");
+  const keyCount = prefixSha256 === undefined ? 2 : 3;
+  if (
+    Object.keys(raw).length !== keyCount ||
+    typeof lastCheckpointStep !== "number" ||
+    typeof lastScannedBytes !== "number" ||
+    (prefixSha256 !== undefined && typeof prefixSha256 !== "string")
+  )
+    throw new Error(`Malformed cursor in ${path}`);
+  return prefixSha256 === undefined
+    ? { lastCheckpointStep, lastScannedBytes }
+    : { lastCheckpointStep, lastScannedBytes, prefixSha256 };
 }
 
 function sha256Hex(data: Buffer): string {

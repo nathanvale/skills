@@ -2,7 +2,7 @@ import { expect, setDefaultTimeout, test } from "bun:test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { ContactName } from "../src/google-contacts/domain/rules.ts";
-import { isPlanDoc } from "./support/google-contacts-forged.ts";
+import { requirePlanDoc } from "./support/google-contacts-forged.ts";
 import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
 import { planFromContacts } from "./support/google-contacts-run.ts";
 import { sampleContact } from "./support/google-contacts-stubs.ts";
@@ -164,8 +164,8 @@ async function mergeOutcome(
   if (planned.run.causeCode === "DOMAIN_CONTACTS_PLAN_INVALID") {
     return { outcome: "refused" };
   }
-  if (!isPlanDoc(planned.run.data)) throw new Error(planned.run.message);
-  const names = planned.run.data.updateSubBatches
+  const plan = requirePlanDoc(planned.run.data, planned.run.message);
+  const names = plan.updateSubBatches
     .flatMap((batch) => batch.updates)
     .find((update) => update.resourceName === "people/s")?.fields.names;
   return names === undefined

@@ -78,10 +78,18 @@ const CONTACT_METADATA = {
 };
 
 type Field = keyof typeof WRITABLE_SUBFIELDS_INDEPENDENT_ORACLE;
-const FIELDS = Object.keys(WRITABLE_SUBFIELDS_INDEPENDENT_ORACLE).filter(
-  (key): key is Field =>
-    Object.hasOwn(WRITABLE_SUBFIELDS_INDEPENDENT_ORACLE, key),
-);
+const FIELDS: readonly Field[] = [
+  "names",
+  "phoneNumbers",
+  "emailAddresses",
+  "addresses",
+  "organizations",
+  "biographies",
+  "urls",
+  "birthdays",
+  "events",
+  "relations",
+];
 
 const NAMED_LOCAL_PHONE = { value: "0491 570 112", type: "work" };
 const UNTOUCHED_AMBIGUOUS_PHONE = { value: "ext 42", type: "other" };

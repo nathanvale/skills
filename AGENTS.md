@@ -7,7 +7,7 @@ Check command: `bun run check`
 Build portable skill CLIs: `bun run build:skills`
 Smoke: `bun run start -- --help`
 Source packet: `https://github.com/nathanvale/skills`
-Template source: `9ed0d318155e938e66318a68ee4f685909547b04`
+Template source: `80a63a7b244d3fd87c5b63dea45cdda6d0f5de0c`
 
 ## Kernel skills (authoring, debugging, observability, and CLI proof)
 

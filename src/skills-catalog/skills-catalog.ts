@@ -164,8 +164,10 @@ export function discoverSkills(root = MODULE_ROOT): readonly SkillEntry[] {
 
 const FRONTMATTER_OPENS_WITH_A_FIELD = /^---\r?\n[A-Za-z]/;
 
-function isYamlMapping(value: unknown): value is object {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+function asYamlMapping(value: unknown): object | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value
+    : null;
 }
 
 function readYamlOrNull(path: string): unknown {
@@ -177,12 +179,13 @@ function readYamlOrNull(path: string): unknown {
 }
 
 function codexRefusesImplicitInvocation(document: unknown): boolean {
-  if (!isYamlMapping(document) || !Object.hasOwn(document, "policy")) {
+  const root = asYamlMapping(document);
+  if (root === null || !Object.hasOwn(root, "policy")) {
     return false;
   }
-  const policy: unknown = Reflect.get(document, "policy");
+  const policy = asYamlMapping(Reflect.get(root, "policy"));
   return (
-    isYamlMapping(policy) &&
+    policy !== null &&
     Object.hasOwn(policy, "allow_implicit_invocation") &&
     Reflect.get(policy, "allow_implicit_invocation") === false
   );
