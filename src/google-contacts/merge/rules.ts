@@ -90,7 +90,10 @@ function dedupeByIdentity<T extends { readonly metadata?: FieldMetadata }>(
   const seen = new Set<string>();
   const out: T[] = [];
   for (const item of stripNonContactSource(items)) {
-    const sig = entryIdentity(field, item).toLowerCase();
+    const valueOnly = Object.fromEntries(
+      Object.entries(item).filter(([key]) => key !== "metadata"),
+    );
+    const sig = entryIdentity(field, valueOnly).toLowerCase();
     if (seen.has(sig)) continue;
     seen.add(sig);
     out.push(item);

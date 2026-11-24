@@ -54,6 +54,24 @@ const phoned = sampleContact("p", {
     { value: "+12025550101", type: "work" },
   ],
 });
+const phonedTwice = sampleContact("t", {
+  phoneNumbers: [
+    { value: "0491 570 404", type: "mobile" },
+    { value: "+61491570404", type: "home" },
+  ],
+});
+const primaried = sampleContact("m", {
+  emailAddresses: [
+    {
+      value: "m.primary@example.com",
+      type: "work",
+      metadata: {
+        sourcePrimary: true,
+        source: { type: "CONTACT", id: "m" },
+      },
+    },
+  ],
+});
 const enriched = sampleContact("e");
 const nicknameField = { nicknames: [{ value: "Sky" }] };
 const duplicateWithNickname: ContactRecord = { ...duplicate, ...nicknameField };
@@ -66,6 +84,13 @@ const MERGE_PROPOSAL = {
   kind: "duplicate-merge",
   target: "people/s",
   duplicates: ["people/d"],
+};
+
+const PHONE_PROPOSAL = {
+  kind: "phone-normalize",
+  target: "people/p",
+  confidence: "high",
+  phoneNumbers: [{ value: "0491 570 403", type: "mobile" }],
 };
 
 type Body = MutationPlanBody;
@@ -358,6 +383,77 @@ const ROWS: readonly ForgedRow[] = [
       })),
   },
   {
+    name: "phone-normalize relabels the normalized live phone from mobile to home",
+    lane: "phone-normalize",
+    planned: [phoned],
+    live: [phoned],
+    proposal: PHONE_PROPOSAL,
+    forge: (body) =>
+      withFirstUpdate(body, (update) => ({
+        ...update,
+        fields: {
+          phoneNumbers: (update.fields.phoneNumbers ?? []).map((phone) =>
+            phone.type === "mobile" ? { ...phone, type: "home" } : phone,
+          ),
+        },
+      })),
+  },
+  {
+    name: "phone-normalize injects an E.164 number that matches no live phone",
+    lane: "phone-normalize",
+    planned: [phoned],
+    live: [phoned],
+    proposal: PHONE_PROPOSAL,
+    forge: (body) =>
+      withFirstUpdate(body, (update) => ({
+        ...update,
+        fields: {
+          phoneNumbers: [
+            ...(update.fields.phoneNumbers ?? []),
+            { value: "+12025550199", type: "other" },
+          ],
+        },
+      })),
+  },
+  {
+    name: "phone-normalize keeps the lower-specificity label when folding duplicate numbers",
+    lane: "phone-normalize",
+    planned: [phonedTwice],
+    live: [phonedTwice],
+    proposal: {
+      kind: "phone-normalize",
+      target: "people/t",
+      confidence: "high",
+    },
+    forge: (body) =>
+      withFirstUpdate(body, (update) => ({
+        ...update,
+        fields: { phoneNumbers: [{ value: "+61491570404", type: "home" }] },
+      })),
+  },
+  {
+    name: "metadata-enrich drops a live email's writable sourcePrimary flag",
+    lane: "metadata-enrich",
+    planned: [primaried],
+    live: [primaried],
+    proposal: {
+      kind: "metadata-enrich",
+      target: "people/m",
+      confidence: "high",
+      emailAddresses: [{ value: "m.second@example.com", type: "home" }],
+    },
+    forge: (body) =>
+      withFirstUpdate(body, (update) => ({
+        ...update,
+        fields: {
+          ...update.fields,
+          emailAddresses: (update.fields.emailAddresses ?? []).map(
+            ({ metadata: _metadata, ...email }) => email,
+          ),
+        },
+      })),
+  },
+  {
     name: "a contact-delete target names a Merge cluster Survivor outside duplicate-merge",
     lane: "contact-delete",
     planned: [unrelated],
@@ -381,7 +477,7 @@ const ROWS: readonly ForgedRow[] = [
   },
 ];
 
-const EXPECTED_ROW_COUNT = 14;
+const EXPECTED_ROW_COUNT = 18;
 
 function isPlanDoc(value: unknown): value is MutationPlanDoc {
   return (

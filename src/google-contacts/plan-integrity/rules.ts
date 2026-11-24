@@ -3,7 +3,11 @@ import {
   parseE164Phone,
   stripNonContactSource,
 } from "../domain/rules.ts";
-import type { ContactRecord, FieldMetadata } from "../domain/rules.ts";
+import type {
+  ContactPhone,
+  ContactRecord,
+  FieldMetadata,
+} from "../domain/rules.ts";
 import {
   biographyEntryWithValue,
   buildAppendedBiography,
@@ -12,7 +16,7 @@ import {
 } from "../merge/rules.ts";
 import { entryIdentity } from "../person-fields/rules.ts";
 import type { ContactListField } from "../person-fields/rules.ts";
-import { phoneMatchesE164 } from "../phone/rules.ts";
+import { deduplicatePhoneList, phoneMatchesE164 } from "../phone/rules.ts";
 import type {
   MutationPlanDoc,
   PlannedContactUpdate,
@@ -167,34 +171,39 @@ function verifyListsPreserveLive(
   return null;
 }
 
+function normalizedLivePhones(
+  live: readonly ContactPhone[],
+  planned: readonly ContactPhone[],
+): readonly ContactPhone[] {
+  const liveIds = new Set(live.map((p) => entryIdentity("phoneNumbers", p)));
+  const targets = planned
+    .filter((p) => !liveIds.has(entryIdentity("phoneNumbers", p)))
+    .map((p) => p.value)
+    .filter((value) => parseE164Phone(value) !== null);
+  return deduplicatePhoneList(
+    live.map((phone) => {
+      const target = targets.find((value) =>
+        phoneMatchesE164(phone.value, value),
+      );
+      return target === undefined ? phone : { ...phone, value: target };
+    }),
+  );
+}
+
 function verifyPhonesAgainstLive(
   update: PlannedContactUpdate,
   contact: ContactRecord,
 ): string | null {
   const planned = update.fields.phoneNumbers ?? [];
-  const live = stripNonContactSource(contact.phoneNumbers);
-  const liveIds = new Set(live.map((p) => entryIdentity("phoneNumbers", p)));
-  const invented = planned.find(
-    (p) =>
-      parseE164Phone(p.value) === null &&
-      !liveIds.has(entryIdentity("phoneNumbers", p)),
+  const expected = normalizedLivePhones(
+    stripNonContactSource(contact.phoneNumbers),
+    planned,
   );
-  if (invented !== undefined) {
-    return `phone-normalize update for ${update.resourceName} writes non-E.164 phone ${invented.value} that is not on the live Contact.`;
-  }
-  const lost = live.find(
-    (liveP) =>
-      !planned.some(
-        (p) =>
-          entryIdentity("phoneNumbers", p) ===
-            entryIdentity("phoneNumbers", liveP) ||
-          (parseE164Phone(p.value) !== null &&
-            phoneMatchesE164(liveP.value, p.value)),
-      ),
-  );
-  return lost === undefined
+  const identities = (phones: readonly ContactPhone[]): string =>
+    canonicalJson(phones.map((p) => entryIdentity("phoneNumbers", p)));
+  return identities(planned) === identities(expected)
     ? null
-    : `phone-normalize update for ${update.resourceName} drops live phone ${lost.value}.`;
+    : `phone-normalize update for ${update.resourceName} is not the live phone list rewritten to E.164 with every label and writable subfield kept and duplicates folded by type specificity.`;
 }
 
 function verifyNoteAgainstLive(

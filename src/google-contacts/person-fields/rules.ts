@@ -179,10 +179,18 @@ export function writableSubfieldKeys(
   );
 }
 
+const WRITABLE_METADATA_FLAGS = ["sourcePrimary"] as const;
+
 export function entryIdentity(field: ContactListField, entry: object): string {
   const kept: Record<string, unknown> = {};
   for (const key of writableSubfieldKeys(field, entry)) {
     kept[key] = ownValue(entry, key);
+  }
+  const metadata = asObject(ownValue(entry, "metadata"));
+  for (const flag of WRITABLE_METADATA_FLAGS) {
+    if (metadata !== null && ownValue(metadata, flag) === true) {
+      kept[`metadata.${flag}`] = true;
+    }
   }
   return canonicalJson(kept);
 }
