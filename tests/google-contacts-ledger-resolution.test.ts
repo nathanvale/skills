@@ -4,7 +4,7 @@ import {
   resolveLedgerRoot,
 } from "../src/google-contacts/ledger.ts";
 
-test("ledger resolution walks explicit dir, suite data home, XDG data home, then HOME, ignoring relative and empty values", () => {
+test("ledger resolution walks explicit dir, suite root, XDG data home, then HOME, ignoring relative and empty values", () => {
   const explicit = "/abs/ledger-explicit";
   const suite = "/abs/suite-data";
   const xdgData = "/abs/xdg-data";
@@ -38,7 +38,7 @@ test("ledger resolution walks explicit dir, suite data home, XDG data home, then
       expected: { ok: false, reason: "relative-ledger-dir" },
     },
     {
-      name: "empty explicit dir falls through to the suite data home",
+      name: "empty explicit dir falls through to the suite root",
       env: {
         GOOGLE_CONTACTS_LEDGER_DIR: "",
         NATHANVALE_SKILLS_DATA_HOME: suite,
@@ -52,7 +52,7 @@ test("ledger resolution walks explicit dir, suite data home, XDG data home, then
       },
     },
     {
-      name: "relative suite data home falls through to XDG data home",
+      name: "relative suite root falls through to XDG data home",
       env: {
         NATHANVALE_SKILLS_DATA_HOME: "rel/suite",
         XDG_DATA_HOME: xdgData,
@@ -65,7 +65,7 @@ test("ledger resolution walks explicit dir, suite data home, XDG data home, then
       },
     },
     {
-      name: "empty suite data home falls through to XDG data home",
+      name: "empty suite root falls through to XDG data home",
       env: {
         NATHANVALE_SKILLS_DATA_HOME: "",
         XDG_DATA_HOME: xdgData,

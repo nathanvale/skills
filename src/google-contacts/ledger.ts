@@ -48,11 +48,11 @@ export function resolveLedgerRoot(
       source: "GOOGLE_CONTACTS_LEDGER_DIR",
     };
   }
-  const suiteData = absoluteOrNull(env.NATHANVALE_SKILLS_DATA_HOME);
-  if (suiteData !== null) {
+  const suiteRoot = absoluteOrNull(env.NATHANVALE_SKILLS_DATA_HOME);
+  if (suiteRoot !== null) {
     return {
       ok: true,
-      root: join(suiteData, ...SKILL_LEDGER_SEGMENTS),
+      root: join(suiteRoot, ...SKILL_LEDGER_SEGMENTS),
       source: "NATHANVALE_SKILLS_DATA_HOME",
     };
   }

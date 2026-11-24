@@ -98,9 +98,9 @@ _Avoid_: Token, approval grant, signature, checksum
 The local durable store (`GOOGLE_CONTACTS_LEDGER_DIR`, `$NATHANVALE_SKILLS_DATA_HOME/google-contacts/ledger`, `$XDG_DATA_HOME/nathanvale-skills/google-contacts/ledger`, or `$HOME/.local/share/nathanvale-skills/google-contacts/ledger`) tracking in-flight and unfinished Google Contacts mutations so an interrupted change blocks only the affected Contacts until a qualified close exists.
 _Avoid_: State folder, state dir, journal dir, database
 
-**Suite data home**:
-The data folder shared by every nathanvale-skills skill: `$NATHANVALE_SKILLS_DATA_HOME` when absolute, else `$XDG_DATA_HOME/nathanvale-skills`, else `$HOME/.local/share/nathanvale-skills`. The Contact ledger lives at `google-contacts/ledger` inside it.
-_Avoid_: State home, coordination folder
+**Suite root**:
+The absolute folder that a suite's components live under. For data, `$NATHANVALE_SKILLS_DATA_HOME` sets it when absolute, else it is `$XDG_DATA_HOME/nathanvale-skills`, else `$HOME/.local/share/nathanvale-skills`. The Contact ledger lives at `google-contacts/ledger` inside it.
+_Avoid_: Suite data home, State home, coordination folder
 
 **Unfinished mutation**:
 A recorded Contact change that started without confirmed completion, blocking subsequent mutations to the affected Contacts until a qualified close exists.
