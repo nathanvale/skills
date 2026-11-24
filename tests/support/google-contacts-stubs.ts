@@ -1,15 +1,10 @@
-import {
-  chmodSync,
-  existsSync,
-  readFileSync,
-  watch,
-  writeFileSync,
-} from "node:fs";
-import { dirname, join } from "node:path";
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import type {
   ContactRecord,
   ContactSnapshotDoc,
 } from "../../src/google-contacts/domain/rules.ts";
+import { registerStub } from "./google-contacts-processes.ts";
 
 export type GogStubBehavior = {
   readonly version?: string;
@@ -103,54 +98,12 @@ export function sampleSnapshot(
   };
 }
 
-export function waitForFile(
-  filePath: string,
-  options: {
-    readonly timeoutMs?: number;
-    readonly abandonWhen?: Promise<unknown>;
-  } = {},
-): Promise<void> {
-  if (existsSync(filePath)) return Promise.resolve();
-  const timeoutMs = options.timeoutMs ?? 30_000;
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const finish = (error?: Error): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      clearInterval(recheck);
-      watcher.close();
-      if (error !== undefined) reject(error);
-      else resolve();
-    };
-    const resolveIfPresent = (): boolean => {
-      if (existsSync(filePath)) finish();
-      return settled;
-    };
-    const watcher = watch(dirname(filePath), () => {
-      resolveIfPresent();
-    });
-    const recheck = setInterval(resolveIfPresent, 100);
-    const timer = setTimeout(() => {
-      if (!resolveIfPresent()) {
-        finish(new Error(`Timed out waiting for file ${filePath}.`));
-      }
-    }, timeoutMs);
-    void options.abandonWhen?.then(
-      () => {
-        if (!resolveIfPresent()) {
-          finish(new Error(`Process exited before ${filePath} appeared.`));
-        }
-      },
-      () => undefined,
-    );
-    resolveIfPresent();
-  });
-}
-
 const STUB_GOG_BODY = `
-import { existsSync, readFileSync, watch, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { existsSync, readFileSync, rmSync, watch, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+const pidFile = join(pidDir, String(process.pid));
+writeFileSync(pidFile, String(process.pid), "utf8");
+process.on("exit", () => rmSync(pidFile, { force: true }));
 const state = JSON.parse(readFileSync(statePath, "utf8"));
 const b = state.behavior ?? {};
 const args = process.argv.slice(2);
@@ -384,11 +337,14 @@ export function createGogStub(
   const binPath = join(folder, "gog-stub");
   const statePath = join(folder, "gog-state.json");
   const logPath = join(folder, "gog-log.json");
+  const pidDir = join(folder, "gog-pids");
+  mkdirSync(pidDir, { recursive: true });
+  registerStub({ binPath, pidDir });
   writeFileSync(statePath, JSON.stringify(initial), "utf8");
   writeFileSync(logPath, "[]", "utf8");
   writeFileSync(
     binPath,
-    `#!${process.execPath}\nconst statePath = ${JSON.stringify(statePath)};\nconst logPath = ${JSON.stringify(logPath)};\n${STUB_GOG_BODY}`,
+    `#!${process.execPath}\nconst statePath = ${JSON.stringify(statePath)};\nconst logPath = ${JSON.stringify(logPath)};\nconst pidDir = ${JSON.stringify(pidDir)};\n${STUB_GOG_BODY}`,
     "utf8",
   );
   chmodSync(binPath, 0o755);

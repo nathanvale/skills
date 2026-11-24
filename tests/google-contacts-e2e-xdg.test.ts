@@ -10,9 +10,13 @@ import {
 import { dirname, join } from "node:path";
 import { repositoryRoot } from "../src/skills-catalog/skills-catalog.ts";
 import {
+  reapTestProcesses,
+  spawnOwnedProcess,
+  waitForFile,
+} from "./support/google-contacts-processes.ts";
+import {
   createGogStub,
   sampleContact,
-  waitForFile,
 } from "./support/google-contacts-stubs.ts";
 import { testFolder } from "./support/test-folder.ts";
 
@@ -63,7 +67,6 @@ function readSeal(data: unknown): string {
 
 test("sterile copied skill bundle runs full pipeline, concurrent APPLY_HELD, and SIGTERM narrow-scope isolation", async () => {
   const dir = testFolder("gc-sterile-e2e-");
-  const activeProcs: ReturnType<typeof Bun.spawn>[] = [];
   try {
     const skillDest = join(dir, "google-contacts");
     cpSync(
@@ -186,7 +189,7 @@ test("sterile copied skill bundle runs full pipeline, concurrent APPLY_HELD, and
       GOOGLE_CONTACTS_LEDGER_DIR: ledgerDir,
       GOOGLE_CONTACTS_GOG_BIN: holdGog.binPath,
     });
-    const procA = Bun.spawn(
+    const procA = spawnOwnedProcess(
       [
         process.execPath,
         bundlePath,
@@ -197,9 +200,8 @@ test("sterile copied skill bundle runs full pipeline, concurrent APPLY_HELD, and
         sealC1,
         "--json",
       ],
-      { cwd: dir, env: holdEnv, stdout: "pipe", stderr: "pipe" },
+      { cwd: dir, env: holdEnv },
     );
-    activeProcs.push(procA);
     await waitForFile(holdReady, { abandonWhen: procA.exited });
 
     const procB = runBundle(bundlePath, dir, holdEnv, [
@@ -232,7 +234,7 @@ test("sterile copied skill bundle runs full pipeline, concurrent APPLY_HELD, and
       GOOGLE_CONTACTS_LEDGER_DIR: sigLedger,
       GOOGLE_CONTACTS_GOG_BIN: hangGog.binPath,
     });
-    const victim = Bun.spawn(
+    const victim = spawnOwnedProcess(
       [
         process.execPath,
         bundlePath,
@@ -243,9 +245,8 @@ test("sterile copied skill bundle runs full pipeline, concurrent APPLY_HELD, and
         sealC1,
         "--json",
       ],
-      { cwd: dir, env: sigEnv, stdout: "pipe", stderr: "pipe" },
+      { cwd: dir, env: sigEnv },
     );
-    activeProcs.push(victim);
     await waitForFile(hangReady, { abandonWhen: victim.exited });
     victim.kill("SIGTERM");
     const victimExit = await victim.exited;
@@ -288,9 +289,7 @@ test("sterile copied skill bundle runs full pipeline, concurrent APPLY_HELD, and
     expect(siblingC2.exitCode).toBe(0);
     expect(siblingC2.causeCode).toBe("SUCCESS_COMPLETED");
   } finally {
-    for (const proc of activeProcs) {
-      if (proc.exitCode === null) proc.kill("SIGKILL");
-    }
+    reapTestProcesses();
     rmSync(dir, { recursive: true, force: true });
   }
 });
