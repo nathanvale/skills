@@ -26,6 +26,14 @@ claude plugin marketplace add nathanvale/skills
 claude plugin install nathanvale-skills@nathanvale
 ```
 
+### Antigravity
+
+Install the plugin from a local checkout of this repository:
+
+```sh
+agy plugin install /path/to/skills
+```
+
 ### Codex
 
 ```sh
@@ -54,9 +62,14 @@ None yet.
 
 ## Hooks
 
-### Coordinator reground (Claude Code)
+### Coordinator reground (Claude Code and Antigravity)
 
-After a coordinator session's context is compacted, this `SessionStart` hook puts a short reground note back into that session's context. The note tells the coordinator to reread its standing orders and its unit state in the state folder before any gated act. The hook stays silent for every session that is not on the coordinator roster, and for subagents.
+After a coordinator session compacts its context, this plugin puts a short reground note back into that session's context. The note tells the coordinator to reread its standing orders and its unit state in the state folder before any gated act. The hook stays silent for every session that is not on the coordinator roster, and for subagents.
+
+Both platforms share the same coordinator roster, state folder, shell wrapper (`hooks/coordinator/compaction-reground.sh`), and reground wording:
+
+- **Claude Code** loads `hooks/claude/hooks.json`, which runs on `SessionStart` (`compact`) and returns `hookSpecificOutput.additionalContext`.
+- **Antigravity** loads root `hooks.json` (`coordinator-compaction-reground`), which runs on `PreInvocation`. For rostered conversations, the hook scans `transcriptPath` from its saved byte offset for new completed `CHECKPOINT` steps. It injects `injectSteps[0].systemMessage.systemMessage` once per compaction and saves the compaction cursor in `<state folder>/compaction-cursors/<conversationId>`. Non-rostered conversations exit with `{}` and never create `compaction-cursors/`. If `/rewind` truncates a transcript, the cursor resets without a repeat injection and fires again on the next `CHECKPOINT`.
 
 The hook reads one state folder:
 
@@ -64,22 +77,24 @@ The hook reads one state folder:
 - Otherwise, `$XDG_STATE_HOME/my-agent-dojo/agent-coordination`, when `XDG_STATE_HOME` is an absolute path.
 - Otherwise, `$HOME/.local/state/my-agent-dojo/agent-coordination`.
 
-The roster is the `coordinator-roster` folder inside the state folder. Each roster entry is a file named by a session id. Its first line is the coordinator's folder name in the state folder: lowercase letters, digits, and hyphens, up to 64 characters. Any other first line gets a note without the folder name.
+The roster is the `coordinator-roster` folder inside the state folder. Each roster entry is a file named by a session id or conversation id. Its first line is the coordinator's folder name in the state folder: lowercase letters, digits, and hyphens, up to 64 characters. Any other first line gets a note without the folder name.
 
-Claude Code passes its own environment to the hook. Set `COORDINATION_STATE_DIR` in the environment that Claude Code starts with, not in a project's `.env` file.
+Claude Code and Antigravity pass their own environment to the hook. Set `COORDINATION_STATE_DIR` in the environment that the tool starts with, not in a project's `.env` file.
 
 To register a coordinator, run these commands from its own shell. Replace `example-coordinator` with its folder name:
 
 ```sh
+session_id="${CLAUDE_CODE_SESSION_ID:-${ANTIGRAVITY_CONVERSATION_ID:?}}"
 roster="${COORDINATION_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/my-agent-dojo/agent-coordination}/coordinator-roster"
-mkdir -p "$roster" && printf '%s\n' example-coordinator > "$roster/${CLAUDE_CODE_SESSION_ID:?}"
+mkdir -p "$roster" && printf '%s\n' example-coordinator > "$roster/$session_id"
 ```
 
 To remove it, run:
 
 ```sh
-roster="${COORDINATION_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/my-agent-dojo/agent-coordination}/coordinator-roster"
-rm "$roster/${CLAUDE_CODE_SESSION_ID:?}"
+session_id="${CLAUDE_CODE_SESSION_ID:-${ANTIGRAVITY_CONVERSATION_ID:?}}"
+state="${COORDINATION_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/my-agent-dojo/agent-coordination}"
+rm -f "$state/coordinator-roster/$session_id" "$state/compaction-cursors/$session_id"
 ```
 
 The hook needs `bun` on `PATH`. Without it, the hook does nothing. The hook looks up `bun` from inside the plugin's own folder, so a `bun` in the session's project folder never runs.
