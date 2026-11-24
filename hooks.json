@@ -1,0 +1,11 @@
+{
+  "coordinator-compaction-reground": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "/bin/sh ./hooks/coordinator/compaction-reground.sh --antigravity",
+        "timeout": 5
+      }
+    ]
+  }
+}
