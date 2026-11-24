@@ -241,9 +241,11 @@ describe("Antigravity compaction detection and cursor lifecycle", () => {
     );
     const cursorFile = join(stateDir, "compaction-cursors", CONVERSATION_ID);
     expect(lstatSync(cursorFile).mode & 0o777).toBe(0o600);
+    const bytes = readFileSync(transcriptFile);
     expect(JSON.parse(readFileSync(cursorFile, "utf8"))).toEqual({
       lastCheckpointStep: 6,
-      lastScannedBytes: Buffer.byteLength(readFileSync(transcriptFile)),
+      lastScannedBytes: bytes.length,
+      tailHex: bytes.subarray(Math.max(0, bytes.length - 32)).toString("hex"),
     });
 
     expectEmptyAgy(invokeWrapper(agyPayload(transcriptFile), env));
@@ -268,9 +270,11 @@ describe("Antigravity compaction detection and cursor lifecycle", () => {
     );
 
     const cursorFile = join(stateDir, "compaction-cursors", CONVERSATION_ID);
+    const bytes = readFileSync(transcriptFile);
     expect(JSON.parse(readFileSync(cursorFile, "utf8"))).toEqual({
       lastCheckpointStep: 15,
-      lastScannedBytes: Buffer.byteLength(readFileSync(transcriptFile)),
+      lastScannedBytes: bytes.length,
+      tailHex: bytes.subarray(Math.max(0, bytes.length - 32)).toString("hex"),
     });
     expectEmptyAgy(invokeWrapper(agyPayload(transcriptFile), env));
   });
