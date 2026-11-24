@@ -359,20 +359,44 @@ type PersonResponseDecoding =
 
 const NOT_FOUND_STATUS_CODE = 5;
 
+const OK_STATUS_CODE = 0;
+
+function responseStatusCode(obj: object): number | null {
+  const raw = ownValue(obj, "status");
+  if (raw === undefined) return OK_STATUS_CODE;
+  const status = asObject(raw);
+  if (status === null) return null;
+  return ownValue(status, "code") === undefined
+    ? OK_STATUS_CODE
+    : ownNumber(status, "code");
+}
+
+function httpStatusAccepts(obj: object, found: boolean): boolean {
+  const raw = ownValue(obj, "httpStatusCode");
+  if (raw === undefined) return true;
+  const code = ownNumber(obj, "httpStatusCode");
+  if (code === null) return false;
+  return found ? code >= 200 && code < 300 : code === 404;
+}
+
 function decodePersonResponse(raw: unknown): PersonResponseDecoding | null {
   const obj = asObject(raw);
   if (obj === null) return null;
   const requested = ownString(obj, "requestedResourceName");
   if (requested === null) return null;
+  const statusCode = responseStatusCode(obj);
   const person = ownValue(obj, "person");
-  if (person !== undefined) {
+  if (statusCode === OK_STATUS_CODE && person !== undefined) {
     const record = decodeContactRecord(person);
-    return record !== null && record.resourceName === requested
+    return record !== null &&
+      record.resourceName === requested &&
+      httpStatusAccepts(obj, true)
       ? { kind: "person", requested, record }
       : null;
   }
-  const status = asObject(ownValue(obj, "status"));
-  return status !== null && ownNumber(status, "code") === NOT_FOUND_STATUS_CODE
+  return statusCode === NOT_FOUND_STATUS_CODE &&
+    person === undefined &&
+    httpStatusAccepts(obj, false)
     ? { kind: "absent", requested }
     : null;
 }

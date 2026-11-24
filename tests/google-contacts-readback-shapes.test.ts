@@ -44,9 +44,21 @@ const targetWithoutEtag = Object.fromEntries(
   Object.entries(target).filter(([key]) => key !== "etag"),
 );
 
+const mergeSurvivor = sampleContact("rs", {
+  names: [{ givenName: "Alex", familyName: "Example" }],
+  phoneNumbers: [{ value: "+61491570601", type: "mobile" }],
+  emailAddresses: [{ value: "alex.rb@example.com", type: "work" }],
+});
+const mergeDuplicate = sampleContact("rd", {
+  names: [{ givenName: "Alex" }],
+  phoneNumbers: [{ value: "+61491570601", type: "mobile" }],
+  emailAddresses: [{ value: "alex.rb@example.com", type: "work" }],
+  organizations: [],
+});
+
 type ShapeRow = {
   readonly name: string;
-  readonly lane: "note-append" | "contact-delete";
+  readonly lane: "note-append" | "contact-delete" | "duplicate-merge";
   readonly stubContacts: readonly ContactRecord[];
   readonly behavior: GogStubBehavior;
   readonly expectedCause: string;
@@ -186,11 +198,39 @@ const ROWS: readonly ShapeRow[] = [
     expectedCause: "DOMAIN_CONTACTS_APPLY_UNCONFIRMED",
     expectWrites: true,
   },
+  {
+    name: "a final read-back at exit 1 pairing a Survivor person carrying status 13 with a Duplicate NOT_FOUND is unconfirmed",
+    lane: "duplicate-merge",
+    stubContacts: [mergeSurvivor, mergeDuplicate],
+    behavior: {
+      failPersonOnCall: {
+        call: 3,
+        resourceName: "people/rs",
+        code: 13,
+        httpStatusCode: 500,
+      },
+    },
+    expectedCause: "DOMAIN_CONTACTS_APPLY_UNCONFIRMED",
+    expectWrites: true,
+  },
 ];
 
-const EXPECTED_ROW_COUNT = 14;
+const EXPECTED_ROW_COUNT = 15;
+
+function plannedContacts(lane: ShapeRow["lane"]): readonly ContactRecord[] {
+  return lane === "duplicate-merge"
+    ? [mergeSurvivor, mergeDuplicate]
+    : [target];
+}
 
 function proposalFor(lane: ShapeRow["lane"]): unknown {
+  if (lane === "duplicate-merge") {
+    return {
+      kind: "duplicate-merge",
+      target: "people/rs",
+      duplicates: ["people/rd"],
+    };
+  }
   return lane === "note-append"
     ? {
         kind: "note-append",
@@ -216,7 +256,7 @@ test("the read-back shape table settles every gog batch get shape to its require
       mkdirSync(dir, { recursive: true });
       const planned = await planFromContacts({
         dir,
-        contacts: [target],
+        contacts: plannedContacts(row.lane),
         lane: row.lane,
         proposals: [proposalFor(row.lane)],
       });

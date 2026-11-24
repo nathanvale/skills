@@ -22,6 +22,12 @@ export type GogStubBehavior = {
   readonly batchGetExit?: number;
   readonly batchGetExitByCall?: Readonly<Record<string, number>>;
   readonly batchGetStdoutByCall?: Readonly<Record<string, string>>;
+  readonly failPersonOnCall?: {
+    readonly call: number;
+    readonly resourceName: string;
+    readonly code: number;
+    readonly httpStatusCode: number;
+  };
   readonly batchUpdateExit?: number;
   readonly failOnUpdateCall?: number;
   readonly failOnUpdateExit?: number;
@@ -195,13 +201,17 @@ if (args[0] === "contacts" && args[1] === "batch" && args[2] === "get") {
     process.exit(0);
   }
   const requested = args.slice(3).filter((x) => x.startsWith("people/"));
+  const failed = b.failPersonOnCall?.call === state.batchGetCount ? b.failPersonOnCall : null;
   const responses = requested.map((rn) => {
     const person = state.contacts.find((c) => c.resourceName === rn);
+    if (person && failed?.resourceName === rn) {
+      return { httpStatusCode: failed.httpStatusCode, person, requestedResourceName: rn, status: { code: failed.code, message: "Internal error encountered." } };
+    }
     return person
       ? { httpStatusCode: 200, person, requestedResourceName: rn }
       : { httpStatusCode: 404, requestedResourceName: rn, status: { code: 5, message: "Requested entity was not found." } };
   });
-  const allFound = responses.every((item) => item.person !== undefined);
+  const allFound = responses.every((item) => item.person !== undefined && item.status === undefined);
   process.stdout.write(JSON.stringify({
     operation: "get",
     requested: requested.length,
