@@ -61,7 +61,7 @@ function readSeal(data: unknown): string {
     : "";
 }
 
-test("Option 1 XDG ledger enforces 0700 lazy creation, preserves existing perms, and ignores relative/empty XDG_STATE_HOME", () => {
+test("data-home ledger enforces 0700 lazy creation, preserves existing perms, and ignores relative/empty XDG_DATA_HOME and XDG_STATE_HOME", () => {
   const dir = testFolder("gc-xdg-option1-");
   try {
     const skillDest = join(dir, "google-contacts");
@@ -130,7 +130,7 @@ test("Option 1 XDG ledger enforces 0700 lazy creation, preserves existing perms,
     ).toBe("DOMAIN_CONTACTS_APPLY_UNAVAILABLE");
     expect(existsSync(join(dir, "rel-ledger-never-create"))).toBe(false);
 
-    const absXdg = join(dir, "xdg-state");
+    const absXdg = join(dir, "xdg-data");
     const expectedXdgLedger = join(
       absXdg,
       "nathanvale-skills",
@@ -139,7 +139,7 @@ test("Option 1 XDG ledger enforces 0700 lazy creation, preserves existing perms,
     );
     const xdgEnv = minimalEnv({
       HOME: homeDir,
-      XDG_STATE_HOME: absXdg,
+      XDG_DATA_HOME: absXdg,
       GOOGLE_CONTACTS_GOG_BIN: gog1.binPath,
     });
     expect(
@@ -167,13 +167,14 @@ test("Option 1 XDG ledger enforces 0700 lazy creation, preserves existing perms,
     });
     const relXdgEnv = minimalEnv({
       HOME: homeDir,
-      XDG_STATE_HOME: "relative/xdg",
+      XDG_DATA_HOME: "relative/xdg",
+      XDG_STATE_HOME: join(dir, "xdg-state-ignored"),
       GOOGLE_CONTACTS_GOG_BIN: gog2.binPath,
     });
     const homeFallbackLedger = join(
       homeDir,
       ".local",
-      "state",
+      "share",
       "nathanvale-skills",
       "google-contacts",
       "ledger",
@@ -194,10 +195,28 @@ test("Option 1 XDG ledger enforces 0700 lazy creation, preserves existing perms,
     expect(existsSync(homeFallbackLedger)).toBe(true);
     expect(statSync(homeFallbackLedger).mode & 0o777).toBe(0o700);
     expect(existsSync(join(dir, "relative"))).toBe(false);
+    expect(existsSync(join(dir, "xdg-state-ignored"))).toBe(false);
+
+    const suiteHome = join(dir, "suite-data");
+    expect(
+      runBundle(
+        bundlePath,
+        dir,
+        minimalEnv({
+          HOME: homeDir,
+          NATHANVALE_SKILLS_DATA_HOME: suiteHome,
+          XDG_DATA_HOME: absXdg,
+        }),
+        ["pending", "--json"],
+      ).data,
+    ).toMatchObject({
+      ledgerRoot: join(suiteHome, "google-contacts", "ledger"),
+      unfinished: [],
+    });
 
     const emptyXdgEnv = minimalEnv({
       HOME: homeDir,
-      XDG_STATE_HOME: "",
+      XDG_DATA_HOME: "",
       GOOGLE_CONTACTS_GOG_BIN: gog2.binPath,
     });
     expect(

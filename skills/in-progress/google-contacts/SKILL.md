@@ -14,8 +14,10 @@ Run every operation through the bundled zero-`node_modules` CLI at `<skill-dir>/
 - **Optional (macOS only):** `openclaw/imsg >= 0.21.1` (`brew install steipete/tap/imsg`) with Full Disk Access granted to the host application.
 - **Contact ledger resolution (read-only commands never create it; `apply` creates missing directories lazily with mode `0700`):**
   1. `GOOGLE_CONTACTS_LEDGER_DIR` when non-empty (must be absolute; relative paths are refused without touching disk).
-  2. `$XDG_STATE_HOME/nathanvale-skills/google-contacts/ledger` when `$XDG_STATE_HOME` is non-empty and absolute.
-  3. `$HOME/.local/state/nathanvale-skills/google-contacts/ledger`.
+  2. `$NATHANVALE_SKILLS_DATA_HOME/google-contacts/ledger` when `$NATHANVALE_SKILLS_DATA_HOME` is non-empty and absolute.
+  3. `$XDG_DATA_HOME/nathanvale-skills/google-contacts/ledger` when `$XDG_DATA_HOME` is non-empty and absolute.
+  4. `$HOME/.local/share/nathanvale-skills/google-contacts/ledger`.
+  An empty or relative `NATHANVALE_SKILLS_DATA_HOME` or `XDG_DATA_HOME` is ignored. `XDG_STATE_HOME` does not move the ledger.
 
 ## Workflow
 

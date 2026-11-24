@@ -155,7 +155,7 @@ test("bundled dist/cli.mjs executes end-to-end in a sterile working directory", 
     );
     const env = {
       PATH: dirname(process.execPath),
-      XDG_STATE_HOME: join(dir, "xdg"),
+      XDG_DATA_HOME: join(dir, "xdg"),
       HOME: join(dir, "home"),
     };
     const pending = Bun.spawnSync(

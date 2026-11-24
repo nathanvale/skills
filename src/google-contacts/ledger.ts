@@ -7,7 +7,11 @@ export type LedgerResolution =
   | {
       readonly ok: true;
       readonly root: string;
-      readonly source: "GOOGLE_CONTACTS_LEDGER_DIR" | "XDG_STATE_HOME" | "HOME";
+      readonly source:
+        | "GOOGLE_CONTACTS_LEDGER_DIR"
+        | "NATHANVALE_SKILLS_DATA_HOME"
+        | "XDG_DATA_HOME"
+        | "HOME";
     }
   | {
       readonly ok: false;
@@ -15,6 +19,15 @@ export type LedgerResolution =
       readonly path: string;
       readonly detail: string;
     };
+
+const SKILL_LEDGER_SEGMENTS = ["google-contacts", "ledger"] as const;
+const SUITE_DATA_SEGMENT = "nathanvale-skills";
+
+function absoluteOrNull(value: string | undefined): string | null {
+  return value !== undefined && value.length > 0 && isAbsolute(value)
+    ? value
+    : null;
+}
 
 export function resolveLedgerRoot(
   env: Readonly<Record<string, string | undefined>>,
@@ -35,22 +48,30 @@ export function resolveLedgerRoot(
       source: "GOOGLE_CONTACTS_LEDGER_DIR",
     };
   }
-  const xdgState = env.XDG_STATE_HOME;
-  if (xdgState !== undefined && xdgState.length > 0 && isAbsolute(xdgState)) {
+  const suiteData = absoluteOrNull(env.NATHANVALE_SKILLS_DATA_HOME);
+  if (suiteData !== null) {
     return {
       ok: true,
-      root: join(xdgState, "nathanvale-skills", "google-contacts", "ledger"),
-      source: "XDG_STATE_HOME",
+      root: join(suiteData, ...SKILL_LEDGER_SEGMENTS),
+      source: "NATHANVALE_SKILLS_DATA_HOME",
     };
   }
-  const home = env.HOME;
-  if (home === undefined || home.length === 0 || !isAbsolute(home)) {
+  const xdgData = absoluteOrNull(env.XDG_DATA_HOME);
+  if (xdgData !== null) {
+    return {
+      ok: true,
+      root: join(xdgData, SUITE_DATA_SEGMENT, ...SKILL_LEDGER_SEGMENTS),
+      source: "XDG_DATA_HOME",
+    };
+  }
+  const home = absoluteOrNull(env.HOME);
+  if (home === null) {
     return {
       ok: false,
       reason: "invalid-home",
-      path: home ?? "",
+      path: env.HOME ?? "",
       detail:
-        "HOME must be set to an absolute path when GOOGLE_CONTACTS_LEDGER_DIR and XDG_STATE_HOME are unset or relative.",
+        "HOME must be set to an absolute path when GOOGLE_CONTACTS_LEDGER_DIR, NATHANVALE_SKILLS_DATA_HOME and XDG_DATA_HOME are unset, empty or relative.",
     };
   }
   return {
@@ -58,10 +79,9 @@ export function resolveLedgerRoot(
     root: join(
       home,
       ".local",
-      "state",
-      "nathanvale-skills",
-      "google-contacts",
-      "ledger",
+      "share",
+      SUITE_DATA_SEGMENT,
+      ...SKILL_LEDGER_SEGMENTS,
     ),
     source: "HOME",
   };
