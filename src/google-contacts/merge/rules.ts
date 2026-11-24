@@ -5,19 +5,48 @@ import {
   serializeAnchor,
   sharedIndependentAnchors,
 } from "../anchors/rules.ts";
-import { canonicalJson, compareCodeUnit } from "../domain/rules.ts";
+import {
+  canonicalJson,
+  compareCodeUnit,
+  parseContactRevision,
+  parseResourceName,
+  stripNonContactSource,
+} from "../domain/rules.ts";
 import type {
   ContactBiography,
   ContactName,
   ContactRecord,
+  ContactRevision,
+  CorroboratedAnchors,
   FieldMetadata,
   FieldMetadataSource,
+  IdentityAnchor,
+  ResourceName,
 } from "../domain/rules.ts";
 import { deduplicatePhoneList } from "../phone/rules.ts";
 import type {
   ContactWireFields,
   PlannedMergeCluster,
 } from "../plan-types/rules.ts";
+
+export type DuplicateMergePatch = {
+  readonly lane: "duplicate-merge";
+  readonly survivor: ResourceName;
+  readonly expectedSurvivorRevision: ContactRevision;
+  readonly duplicates: readonly [
+    {
+      readonly target: ResourceName;
+      readonly expectedRevision: ContactRevision;
+    },
+    ...{
+      readonly target: ResourceName;
+      readonly expectedRevision: ContactRevision;
+    }[],
+  ];
+  readonly corroboration:
+    | { readonly kind: "anchors"; readonly anchors: CorroboratedAnchors }
+    | { readonly kind: "human-confirmed"; readonly note: string };
+};
 
 export const MERGE_ALLOWLIST_FIELDS: ReadonlySet<string> = new Set([
   "names",
@@ -31,19 +60,6 @@ export const MERGE_ALLOWLIST_FIELDS: ReadonlySet<string> = new Set([
   "events",
   "relations",
 ]);
-
-export function isContactOwnedMetadata(
-  metadata: FieldMetadata | undefined,
-): boolean {
-  const type = metadata?.source?.type;
-  return type === undefined || type === "CONTACT";
-}
-
-export function stripNonContactSource<
-  T extends { readonly metadata?: FieldMetadata },
->(items: readonly T[]): readonly T[] {
-  return items.filter((item) => isContactOwnedMetadata(item.metadata));
-}
 
 export function primaryContactSource(
   contact: ContactRecord,
@@ -130,7 +146,13 @@ function mergeSurvivorNames(
 ): readonly ContactName[] | undefined {
   const baseList = stripNonContactSource(survivor.names);
   const current = baseList[0];
-  if (current === undefined) return undefined;
+  if (current === undefined) {
+    for (const dup of duplicates) {
+      const dupOwned = stripNonContactSource(dup.names);
+      if (dupOwned.length > 0) return dupOwned;
+    }
+    return undefined;
+  }
   const givenMissing = (current.givenName ?? "").trim().length === 0;
   const middleMissing = (current.middleName ?? "").trim().length === 0;
   const givenFill = givenMissing
@@ -271,9 +293,56 @@ function buildMergedFields(
   };
 }
 
+function buildTypedMergePatch(
+  survivor: ContactRecord,
+  duplicates: readonly ContactRecord[],
+  corroboration:
+    | { readonly kind: "anchors"; readonly anchors: readonly IdentityAnchor[] }
+    | { readonly kind: "human-confirmed"; readonly note: string },
+): DuplicateMergePatch | null {
+  const survRn = parseResourceName(survivor.resourceName);
+  const survRev = parseContactRevision(survivor.etag);
+  if (survRn === null || survRev === null) return null;
+  const parsedDups: {
+    readonly target: ResourceName;
+    readonly expectedRevision: ContactRevision;
+  }[] = [];
+  for (const dup of duplicates) {
+    const rn = parseResourceName(dup.resourceName);
+    const rev = parseContactRevision(dup.etag);
+    if (rn === null || rev === null) return null;
+    parsedDups.push({ target: rn, expectedRevision: rev });
+  }
+  const firstDup = parsedDups[0];
+  if (firstDup === undefined) return null;
+  if (corroboration.kind === "anchors") {
+    const firstAnchor = corroboration.anchors[0];
+    const secondAnchor = corroboration.anchors[1];
+    if (firstAnchor === undefined || secondAnchor === undefined) return null;
+    return {
+      lane: "duplicate-merge",
+      survivor: survRn,
+      expectedSurvivorRevision: survRev,
+      duplicates: [firstDup, ...parsedDups.slice(1)],
+      corroboration: {
+        kind: "anchors",
+        anchors: [firstAnchor, secondAnchor, ...corroboration.anchors.slice(2)],
+      },
+    };
+  }
+  return {
+    lane: "duplicate-merge",
+    survivor: survRn,
+    expectedSurvivorRevision: survRev,
+    duplicates: [firstDup, ...parsedDups.slice(1)],
+    corroboration,
+  };
+}
+
 export type MergeComputationResult =
   | {
       readonly ok: true;
+      readonly patch: DuplicateMergePatch;
       readonly cluster: PlannedMergeCluster;
       readonly survivorFields: ContactWireFields;
       readonly existingBiography: string;
@@ -328,8 +397,19 @@ export function computeDuplicateMerge(params: {
     .sort(compareCodeUnit);
   const provenanceLine = `[merged-from] ${dupIds.join(", ")}`;
   const firstShared = sharedAll[0] ?? [];
+  const patch = buildTypedMergePatch(
+    params.survivor,
+    params.duplicates,
+    corroboratedByAnchors
+      ? { kind: "anchors", anchors: firstShared }
+      : { kind: "human-confirmed", note: trimmedReason },
+  );
+  if (patch === null) {
+    return { ok: false, reason: "Invalid resourceName or revision in merge." };
+  }
   return {
     ok: true,
+    patch,
     cluster: {
       survivor: params.survivor.resourceName,
       expectedSurvivorRevision: params.survivor.etag,

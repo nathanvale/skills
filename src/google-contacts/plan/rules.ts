@@ -1,5 +1,5 @@
 import type { CountryCode } from "libphonenumber-js/min";
-import { confidenceRank } from "../domain/rules.ts";
+import { confidenceRank, stripNonContactSource } from "../domain/rules.ts";
 import type {
   AuditDoc,
   AuditFinding,
@@ -9,7 +9,7 @@ import type {
   ContactSnapshotDoc,
   EvidenceItem,
 } from "../domain/rules.ts";
-import { primaryContactSource, stripNonContactSource } from "../merge/rules.ts";
+import { primaryContactSource } from "../merge/rules.ts";
 import { normalizeContactPhones } from "../phone/rules.ts";
 import { compileProposalsForLane } from "../plan-proposals/rules.ts";
 import type { LaneBuildOutput } from "../plan-proposals/rules.ts";

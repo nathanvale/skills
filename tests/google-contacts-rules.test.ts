@@ -16,7 +16,13 @@ import {
   parseResourceName,
 } from "../src/google-contacts/domain/rules.ts";
 import type {
+  ContactRevision,
+  CorroboratedAnchors,
   E164Phone,
+  EmailAddress,
+  IdentityAnchor,
+  OrganizationDomain,
+  PlanSeal,
   ResourceName,
 } from "../src/google-contacts/domain/rules.ts";
 import {
@@ -27,9 +33,11 @@ import {
   buildAppendedBiography,
   computeDuplicateMerge,
 } from "../src/google-contacts/merge/rules.ts";
+import type { DuplicateMergePatch } from "../src/google-contacts/merge/rules.ts";
 import {
   normalizeContactPhones,
   normalizePhoneValue,
+  resolveCountryCode,
 } from "../src/google-contacts/phone/rules.ts";
 import { compileMutationPlan } from "../src/google-contacts/plan/rules.ts";
 import { computePlanSeal } from "../src/google-contacts/plan-types/rules.ts";
@@ -42,7 +50,9 @@ import {
   buildWebResearchQueue,
   containsUntrustedSentinel,
   detectWebQueryLeak,
+  evaluateWebEligibility,
 } from "../src/google-contacts/web-firewall/rules.ts";
+import type { WebEligibility } from "../src/google-contacts/web-firewall/rules.ts";
 import {
   sampleContact,
   sampleSnapshot,
@@ -51,10 +61,66 @@ import {
 type IsAssignable<From, To> = [From] extends [To] ? true : false;
 const resourceIsNotPhone: IsAssignable<ResourceName, E164Phone> = false;
 const phoneIsNotResource: IsAssignable<E164Phone, ResourceName> = false;
+const emailIsNotDomain: IsAssignable<EmailAddress, OrganizationDomain> = false;
+const revisionIsNotSeal: IsAssignable<ContactRevision, PlanSeal> = false;
+const rawStringNotResource: IsAssignable<string, ResourceName> = false;
+const singleAnchorNotCorroborated: IsAssignable<
+  readonly [IdentityAnchor],
+  CorroboratedAnchors
+> = false;
+const pairAnchorsCorroborated: IsAssignable<
+  readonly [IdentityAnchor, IdentityAnchor],
+  CorroboratedAnchors
+> = true;
+const eligibleHasTerms: IsAssignable<
+  Extract<WebEligibility, { readonly eligible: true }>["safeQueryTerms"],
+  readonly [string, ...string[]]
+> = true;
+const ineligibleHasNoAnchor: IsAssignable<
+  Extract<WebEligibility, { readonly eligible: false }>,
+  { readonly anchor: unknown }
+> = false;
+const mergeEmptyDupsDisallowed: IsAssignable<
+  readonly [],
+  DuplicateMergePatch["duplicates"]
+> = false;
+const mergeSingleAnchorDisallowed: IsAssignable<
+  {
+    readonly kind: "anchors";
+    readonly anchors: readonly [IdentityAnchor];
+  },
+  DuplicateMergePatch["corroboration"]
+> = false;
 
-test("branded value parsers validate domain formats and keep distinct brands", () => {
-  expect(resourceIsNotPhone).toBe(false);
-  expect(phoneIsNotResource).toBe(false);
+test("branded value parsers and comment-free type assertions hold", () => {
+  expect([
+    resourceIsNotPhone,
+    phoneIsNotResource,
+    emailIsNotDomain,
+    revisionIsNotSeal,
+    rawStringNotResource,
+    singleAnchorNotCorroborated,
+    pairAnchorsCorroborated,
+    eligibleHasTerms,
+    ineligibleHasNoAnchor,
+    mergeEmptyDupsDisallowed,
+    mergeSingleAnchorDisallowed,
+  ]).toEqual([
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    true,
+    false,
+    false,
+    false,
+  ]);
+  expect(resolveCountryCode("BR")).toBe("BR");
+  expect(resolveCountryCode("KR")).toBe("KR");
+  expect(resolveCountryCode("ZZ")).toBeNull();
   expect(parseResourceName("people/c100")?.value).toBe("people/c100");
   expect(parseResourceName("contacts/c100")).toBeNull();
   expect(parseE164Phone("+61491570101")?.value).toBe("+61491570101");
@@ -155,6 +221,45 @@ test("web eligibility firewall redacts bare names and detects leaked queries and
   const queue = buildWebResearchQueue([bareOnly, orgContact]);
   expect(queue.length).toBe(1);
   expect(queue[0]?.contactResourceName).toBe("people/org");
+
+  const phoneOnly = sampleContact("phone-only", {
+    names: [],
+    emailAddresses: [],
+    organizations: [],
+  });
+  const nameAndOrg = sampleContact("name-org", {
+    names: [{ displayName: "Casey Mercer" }],
+    emailAddresses: [{ value: freeMailEmail, type: "home" }],
+    organizations: [{ name: "Contoso Labs" }],
+  });
+  const sensitiveName = sampleContact("sens", {
+    names: [{ displayName: "+61 491 570 222" }],
+    organizations: [{ name: "Northwind", domain: "northwind.example.org" }],
+  });
+  expect(evaluateWebEligibility(bareOnly)).toEqual({
+    eligible: false,
+    reason: "bare-name-only",
+  });
+  expect(evaluateWebEligibility(phoneOnly)).toEqual({
+    eligible: false,
+    reason: "private-anchor-only",
+  });
+  expect(evaluateWebEligibility(sensitiveName)).toEqual({
+    eligible: false,
+    reason: "sensitive-field-excluded",
+  });
+  expect(evaluateWebEligibility(nameAndOrg)).toMatchObject({
+    eligible: true,
+    anchor: {
+      kind: "name-plus-organization",
+      displayName: "Casey Mercer",
+      organization: "Contoso Labs",
+    },
+  });
+  expect(evaluateWebEligibility(orgContact)).toMatchObject({
+    eligible: true,
+    anchor: { kind: "org-domain" },
+  });
 
   const guard = buildLeakGuard([bareOnly, orgContact]);
   expect(detectWebQueryLeak("call +61491570222", guard)).not.toBeNull();

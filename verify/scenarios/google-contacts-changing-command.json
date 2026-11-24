@@ -1,0 +1,135 @@
+{
+  "schema": "verify-scenario/1",
+  "feature": "google-contacts-changing-command",
+  "steps": [
+    {
+      "name": "first-run",
+      "argv": [
+        "apply",
+        "--plan",
+        "{scratch}/plan-c1.json",
+        "--seal",
+        "sha256:316fe7521ce2fd89879148f6c144d300ceba49a59c75c0ca970a7e05293aaee4",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.apply",
+          "causeCode": "SUCCESS_COMPLETED",
+          "transactionState": "completed",
+          "effects.completed": ["contacts.mutate"],
+          "data.targetCount": 1
+        }
+      }
+    },
+    {
+      "name": "second-run-drift",
+      "argv": [
+        "apply",
+        "--plan",
+        "{scratch}/plan-c1.json",
+        "--seal",
+        "sha256:316fe7521ce2fd89879148f6c144d300ceba49a59c75c0ca970a7e05293aaee4",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 3,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.apply",
+          "causeCode": "DOMAIN_CONTACTS_REVISION_DRIFT",
+          "transactionState": "unchanged"
+        }
+      }
+    },
+    {
+      "name": "nothing-pending",
+      "argv": ["pending", "--json"],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.pending",
+          "causeCode": "SUCCESS_UNCHANGED",
+          "data.unfinished.length": 0
+        }
+      }
+    },
+    {
+      "name": "interrupted-run",
+      "timeoutMilliseconds": 2500,
+      "argv": [
+        "apply",
+        "--plan",
+        "{scratch}/plan-hang.json",
+        "--seal",
+        "sha256:551d54784f73524ada7d1e17d5074a7605735a36e6e2258d1b9d85bcbbd694b6",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 143,
+        "timedOut": true,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "interruption-blocks",
+      "argv": [
+        "apply",
+        "--plan",
+        "{scratch}/plan-hang.json",
+        "--seal",
+        "sha256:551d54784f73524ada7d1e17d5074a7605735a36e6e2258d1b9d85bcbbd694b6",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 3,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.apply",
+          "causeCode": "DOMAIN_CONTACTS_APPLY_UNRESOLVED",
+          "transactionState": "unchanged"
+        }
+      }
+    },
+    {
+      "name": "interruption-is-listed",
+      "argv": ["pending", "--json"],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.pending",
+          "causeCode": "SUCCESS_UNCHANGED",
+          "data.unfinished.length": 1,
+          "data.unfinished.0.commandIdentity": "google-contacts.apply",
+          "data.unfinished.0.targets.0": "owner@example.com:people/c-hang"
+        }
+      }
+    },
+    {
+      "name": "interruption-is-narrow",
+      "argv": [
+        "apply",
+        "--plan",
+        "{scratch}/plan-c2.json",
+        "--seal",
+        "sha256:75665e5764e67643989afda172efdb1b9dc11b465f3675bd874f39580a86158d",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.apply",
+          "causeCode": "SUCCESS_COMPLETED",
+          "transactionState": "completed",
+          "data.targetCount": 1
+        }
+      }
+    }
+  ]
+}

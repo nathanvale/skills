@@ -19,7 +19,7 @@ type WebQueryAnchor =
       readonly organization: string;
     };
 
-type WebEligibility =
+export type WebEligibility =
   | {
       readonly eligible: true;
       readonly anchor: WebQueryAnchor;
@@ -84,10 +84,32 @@ function primaryOrgName(contact: ContactRecord): string | null {
   return null;
 }
 
-function evaluateWebEligibility(contact: ContactRecord): WebEligibility {
+function containsSensitivePublicTerm(
+  value: string | null,
+  contact: ContactRecord,
+): boolean {
+  if (value === null) return false;
+  if (PHONE_LIKE_IN_QUERY.test(value)) return true;
+  if (value.match(EMAIL_IN_QUERY) !== null) return true;
+  const lowered = value.toLowerCase();
+  return contact.addresses.some((addr) => {
+    const street = (addr.streetAddress ?? addr.formattedValue ?? "")
+      .trim()
+      .toLowerCase();
+    return street.length >= 6 && lowered.includes(street);
+  });
+}
+
+export function evaluateWebEligibility(contact: ContactRecord): WebEligibility {
   const orgDomain = extractOrgDomainFromContact(contact);
   const displayName = primaryDisplayName(contact);
   const orgName = primaryOrgName(contact);
+  if (
+    containsSensitivePublicTerm(displayName, contact) ||
+    containsSensitivePublicTerm(orgName, contact)
+  ) {
+    return { eligible: false, reason: "sensitive-field-excluded" };
+  }
   if (orgDomain !== null) {
     const terms: [string, ...string[]] =
       displayName !== null && orgName !== null

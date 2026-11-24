@@ -177,6 +177,12 @@ export type IdentityAnchor =
   | { readonly kind: "email"; readonly email: EmailAddress }
   | { readonly kind: "org-domain"; readonly domain: OrganizationDomain };
 
+export type CorroboratedAnchors = readonly [
+  IdentityAnchor,
+  IdentityAnchor,
+  ...IdentityAnchor[],
+];
+
 export type SerializedIdentityAnchor =
   | { readonly kind: "e164-phone"; readonly value: string }
   | { readonly kind: "email"; readonly value: string }
@@ -398,6 +404,19 @@ export function canonicalJson(value: unknown): string {
     parts.push(`${JSON.stringify(key)}:${canonicalJson(field)}`);
   }
   return `{${parts.join(",")}}`;
+}
+
+export function isContactOwnedMetadata(
+  metadata: FieldMetadata | undefined,
+): boolean {
+  const type = metadata?.source?.type;
+  return type === undefined || type === "CONTACT";
+}
+
+export function stripNonContactSource<
+  T extends { readonly metadata?: FieldMetadata },
+>(items: readonly T[]): readonly T[] {
+  return items.filter((item) => isContactOwnedMetadata(item.metadata));
 }
 
 export function sha256Hex(text: string): string {

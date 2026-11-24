@@ -2,16 +2,14 @@ import { countIndependentSerializedAnchors } from "../anchors/rules.ts";
 import {
   canonicalJson,
   compareCodeUnit,
+  isContactOwnedMetadata,
   parseContactRevision,
   parseE164Phone,
   parseEmailAddress,
   parseResourceName,
 } from "../domain/rules.ts";
 import type { ContactRecord } from "../domain/rules.ts";
-import {
-  isContactOwnedMetadata,
-  MERGE_ALLOWLIST_FIELDS,
-} from "../merge/rules.ts";
+import { MERGE_ALLOWLIST_FIELDS } from "../merge/rules.ts";
 import {
   fieldMaskOf,
   HARD_MAX_CONTACTS,
@@ -20,7 +18,6 @@ import {
 } from "../plan-subbatch/rules.ts";
 import { computePlanSeal } from "../plan-types/rules.ts";
 import type {
-  MutationPlanBody,
   MutationPlanDoc,
   PlannedContactUpdate,
   PlannedDeleteTarget,
@@ -94,6 +91,28 @@ function hasForeignSourceEntries(update: PlannedContactUpdate): boolean {
   return false;
 }
 
+function validateBiographyLaneUpdate(
+  lane: "note-append" | "duplicate-merge",
+  update: PlannedContactUpdate,
+): string | null {
+  const bio = update.fields.biographies?.[0]?.value ?? "";
+  const existing = update.existingBiography ?? "";
+  if (!bio.startsWith(existing)) {
+    return `${lane} update for ${update.resourceName} overwrites existing biography prefix.`;
+  }
+  if (lane === "note-append" && containsUntrustedSentinel(bio)) {
+    return `note-append update for ${update.resourceName} contains untrusted sentinel markers.`;
+  }
+  if (
+    lane === "duplicate-merge" &&
+    update.appendedLine !== null &&
+    !bio.includes(update.appendedLine)
+  ) {
+    return `duplicate-merge update for ${update.resourceName} omits merge provenance line.`;
+  }
+  return null;
+}
+
 function validateLaneUpdateFields(
   lane: MutationPlanDoc["lane"],
   update: PlannedContactUpdate,
@@ -102,19 +121,12 @@ function validateLaneUpdateFields(
     const bad = (update.fields.phoneNumbers ?? []).find(
       (phone) => parseE164Phone(phone.value) === null,
     );
-    if (bad !== undefined) {
-      return `phone-normalize update for ${update.resourceName} has non-E.164 phone ${bad.value}.`;
-    }
+    return bad === undefined
+      ? null
+      : `phone-normalize update for ${update.resourceName} has non-E.164 phone ${bad.value}.`;
   }
-  if (lane === "note-append") {
-    const bio = update.fields.biographies?.[0]?.value ?? "";
-    const existing = update.existingBiography ?? "";
-    if (!bio.startsWith(existing)) {
-      return `note-append update for ${update.resourceName} overwrites existing biography prefix.`;
-    }
-    if (containsUntrustedSentinel(bio)) {
-      return `note-append update for ${update.resourceName} contains untrusted sentinel markers.`;
-    }
+  if (lane === "note-append" || lane === "duplicate-merge") {
+    return validateBiographyLaneUpdate(lane, update);
   }
   return null;
 }
@@ -148,7 +160,7 @@ function validateSingleUpdate(
 function validateOneSubBatch(
   lane: MutationPlanDoc["lane"],
   batch: UpdateSubBatch,
-  seenUpdateTargets: Set<string>,
+  seenUpdateTargets: Map<string, string>,
 ): string | null {
   const sortedMask = [...batch.fieldMask].sort(compareCodeUnit);
   if (sortedMask.join(",") !== batch.fieldMask.join(",")) {
@@ -163,7 +175,7 @@ function validateOneSubBatch(
     if (seenUpdateTargets.has(update.resourceName)) {
       return `Contact ${update.resourceName} appears in multiple update sub-batches.`;
     }
-    seenUpdateTargets.add(update.resourceName);
+    seenUpdateTargets.set(update.resourceName, update.expectedRevision);
     const err = validateSingleUpdate(lane, update, batch.fieldMask);
     if (err !== null) return err;
   }
@@ -171,17 +183,6 @@ function validateOneSubBatch(
     serializeSubBatchWireMap(batch.updates).bytes >= MAX_STDIN_PAYLOAD_BYTES
   ) {
     return `Sub-batch ${String(batch.index)} exceeds ${String(MAX_STDIN_PAYLOAD_BYTES)} UTF-8 bytes.`;
-  }
-  return null;
-}
-
-function validateSubBatches(
-  plan: MutationPlanDoc,
-  seenUpdateTargets: Set<string>,
-): string | null {
-  for (const batch of plan.updateSubBatches) {
-    const err = validateOneSubBatch(plan.lane, batch, seenUpdateTargets);
-    if (err !== null) return err;
   }
   return null;
 }
@@ -202,8 +203,8 @@ function validateClusterCorroboration(
 function validateOneMergeCluster(
   cluster: PlannedMergeCluster,
   seenAll: Set<string>,
-  seenUpdateTargets: ReadonlySet<string>,
-  deleteTargetSet: ReadonlySet<string>,
+  seenUpdateTargets: ReadonlyMap<string, string>,
+  deleteTargetSet: ReadonlyMap<string, string>,
 ): string | null {
   if (seenAll.has(cluster.survivor)) {
     return `Merge cluster cycle or duplicate survivor: ${cluster.survivor}.`;
@@ -234,8 +235,8 @@ function validateOneMergeCluster(
 
 function validateMergeClusters(
   plan: MutationPlanDoc,
-  seenUpdateTargets: ReadonlySet<string>,
-  deleteTargetSet: ReadonlySet<string>,
+  seenUpdateTargets: ReadonlyMap<string, string>,
+  deleteTargetSet: ReadonlyMap<string, string>,
 ): string | null {
   if (plan.lane !== "duplicate-merge") {
     return plan.mergeClusters.length === 0
@@ -261,7 +262,7 @@ function validateMergeClusters(
 function validateDeleteTarget(
   lane: MutationPlanDoc["lane"],
   target: PlannedDeleteTarget,
-  deleteTargetSet: Set<string>,
+  deleteTargetSet: Map<string, string>,
 ): string | null {
   if (parseResourceName(target.resourceName) === null) {
     return `Invalid delete resourceName: ${target.resourceName}.`;
@@ -272,7 +273,7 @@ function validateDeleteTarget(
   if (deleteTargetSet.has(target.resourceName)) {
     return `Duplicate delete target ${target.resourceName}.`;
   }
-  deleteTargetSet.add(target.resourceName);
+  deleteTargetSet.set(target.resourceName, target.expectedRevision);
   if (
     lane === "contact-delete" &&
     (!target.confirmedByHuman || target.reason.trim().length === 0)
@@ -284,7 +285,7 @@ function validateDeleteTarget(
 
 function validateDeleteBatches(
   plan: MutationPlanDoc,
-  deleteTargetSet: Set<string>,
+  deleteTargetSet: Map<string, string>,
 ): string | null {
   const allowsDeletes =
     plan.lane === "contact-delete" || plan.lane === "duplicate-merge";
@@ -330,65 +331,82 @@ function validatePlanHeaderAndEvidence(plan: MutationPlanDoc): string | null {
   return null;
 }
 
+function validateTargetRevisions(
+  plan: MutationPlanDoc,
+  seenUpdates: ReadonlyMap<string, string>,
+  deleteMap: ReadonlyMap<string, string>,
+): string | null {
+  const targetMap = new Map<string, string>();
+  for (const target of plan.targets) {
+    if (
+      parseResourceName(target.resourceName) === null ||
+      parseContactRevision(target.expectedRevision) === null ||
+      targetMap.has(target.resourceName)
+    ) {
+      return `Invalid or duplicate target ${target.resourceName}.`;
+    }
+    targetMap.set(target.resourceName, target.expectedRevision);
+  }
+  for (const [rn, rev] of seenUpdates) {
+    if (deleteMap.has(rn) || targetMap.get(rn) !== rev) {
+      return `Update target ${rn} disagrees with plan targets or overlaps delete set.`;
+    }
+  }
+  for (const [rn, rev] of deleteMap) {
+    if (targetMap.get(rn) !== rev) {
+      return `Delete target ${rn} disagrees with plan targets.`;
+    }
+  }
+  return targetMap.size === seenUpdates.size + deleteMap.size
+    ? null
+    : "Plan targets do not match scheduled updates and deletes.";
+}
+
 export function validateMutationPlan(plan: MutationPlanDoc): string | null {
   const headerErr = validatePlanHeaderAndEvidence(plan);
   if (headerErr !== null) return headerErr;
-  const seenUpdates = new Set<string>();
-  const subErr = validateSubBatches(plan, seenUpdates);
-  if (subErr !== null) return subErr;
-  const deleteSet = new Set<string>();
-  const delErr = validateDeleteBatches(plan, deleteSet);
+  const seenUpdates = new Map<string, string>();
+  for (const batch of plan.updateSubBatches) {
+    const err = validateOneSubBatch(plan.lane, batch, seenUpdates);
+    if (err !== null) return err;
+  }
+  const deleteMap = new Map<string, string>();
+  const delErr = validateDeleteBatches(plan, deleteMap);
   if (delErr !== null) return delErr;
-  return validateMergeClusters(plan, seenUpdates, deleteSet);
-}
-
-function extractPlanBody(plan: MutationPlanDoc): MutationPlanBody {
-  return {
-    schemaVersion: plan.schemaVersion,
-    account: plan.account,
-    lane: plan.lane,
-    minConfidence: plan.minConfidence,
-    maxContacts: plan.maxContacts,
-    targetCount: plan.targetCount,
-    targets: plan.targets,
-    updateSubBatches: plan.updateSubBatches,
-    deleteBatches: plan.deleteBatches,
-    mergeClusters: plan.mergeClusters,
-    evidenceSummary: plan.evidenceSummary,
-    leakGuard: plan.leakGuard,
-    skipped: plan.skipped,
-  };
+  return (
+    validateTargetRevisions(plan, seenUpdates, deleteMap) ??
+    validateMergeClusters(plan, seenUpdates, deleteMap)
+  );
 }
 
 export function verifyPlanSealMatch(
   plan: MutationPlanDoc,
   providedSeal: string,
 ): boolean {
-  const computed = computePlanSeal(extractPlanBody(plan)).value;
-  return plan.seal === computed && providedSeal.trim() === computed;
+  const { seal: existingSeal, ...body } = plan;
+  const computed = computePlanSeal(body).value;
+  return existingSeal === computed && providedSeal.trim() === computed;
 }
 
-function stripMetadataArray(items: readonly object[]): readonly string[] {
-  const out: string[] = [];
-  for (const item of items) {
-    const clean: Record<string, unknown> = {};
-    for (const key of Object.keys(item)) {
-      if (key === "metadata") continue;
-      const val: unknown = Reflect.get(item, key);
-      if (val !== undefined) clean[key] = val;
-    }
-    out.push(canonicalJson(clean));
+function objectContainsPlannedFields(live: object, planned: object): boolean {
+  for (const key of Object.keys(planned)) {
+    if (key === "metadata") continue;
+    const expected: unknown = Reflect.get(planned, key);
+    if (expected === undefined) continue;
+    const actual: unknown = Object.hasOwn(live, key)
+      ? Reflect.get(live, key)
+      : undefined;
+    if (canonicalJson(actual) !== canonicalJson(expected)) return false;
   }
-  return out.sort(compareCodeUnit);
+  return true;
 }
 
 function arrayFieldMatches(
   liveItems: readonly object[],
   plannedItems: readonly object[],
 ): boolean {
-  const liveSet = new Set(stripMetadataArray(liveItems));
-  return stripMetadataArray(plannedItems).every((planned) =>
-    liveSet.has(planned),
+  return plannedItems.every((planned) =>
+    liveItems.some((live) => objectContainsPlannedFields(live, planned)),
   );
 }
 

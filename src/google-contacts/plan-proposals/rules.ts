@@ -1,5 +1,5 @@
 import type { CountryCode } from "libphonenumber-js/min";
-import { confidenceRank } from "../domain/rules.ts";
+import { confidenceRank, stripNonContactSource } from "../domain/rules.ts";
 import type {
   ChangeLane,
   ConfidenceTier,
@@ -12,7 +12,6 @@ import {
   computeDuplicateMerge,
   existingBiographyText,
   primaryContactSource,
-  stripNonContactSource,
 } from "../merge/rules.ts";
 import { normalizeContactPhones } from "../phone/rules.ts";
 import { fieldMaskOf } from "../plan-subbatch/rules.ts";

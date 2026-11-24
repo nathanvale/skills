@@ -1,24 +1,14 @@
 import type { CountryCode } from "libphonenumber-js/min";
-import { parsePhoneNumberFromString } from "libphonenumber-js/min";
+import {
+  getCountries,
+  parsePhoneNumberFromString,
+} from "libphonenumber-js/min";
 import type { ContactPhone, E164Phone } from "../domain/rules.ts";
 import { parseE164Phone } from "../domain/rules.ts";
 
-const SUPPORTED_REGIONS: ReadonlyMap<string, CountryCode> = new Map([
-  ["AU", "AU"],
-  ["US", "US"],
-  ["GB", "GB"],
-  ["NZ", "NZ"],
-  ["CA", "CA"],
-  ["DE", "DE"],
-  ["FR", "FR"],
-  ["JP", "JP"],
-  ["SG", "SG"],
-  ["IN", "IN"],
-  ["IE", "IE"],
-  ["NL", "NL"],
-  ["SE", "SE"],
-  ["CH", "CH"],
-]);
+const SUPPORTED_REGIONS: ReadonlyMap<string, CountryCode> = new Map(
+  getCountries().map((code) => [code, code]),
+);
 
 const AU_SHORT_OR_NON_GEO = /^(?:13\d{4}|1300\d{6}|1800\d{6}|190\d{7})$/;
 

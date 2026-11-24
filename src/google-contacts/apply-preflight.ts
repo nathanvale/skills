@@ -129,7 +129,12 @@ export async function runApplyPreflight(params: {
       failure: { cause: TRANSIENT_NOT_STARTED, message: probe.detail },
     };
   }
-  if (probe.parsedPath === null || !probe.versionOk || !probe.authOk) {
+  if (
+    probe.parsedPath === null ||
+    !probe.versionOk ||
+    !probe.schemaOk ||
+    !probe.authOk
+  ) {
     return {
       ok: false,
       failure: {

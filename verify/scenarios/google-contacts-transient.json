@@ -1,0 +1,59 @@
+{
+  "schema": "verify-scenario/1",
+  "feature": "google-contacts-transient",
+  "steps": [
+    {
+      "name": "snapshot-transient",
+      "argv": ["snapshot", "--account", "owner@example.com", "--json"],
+      "expect": {
+        "exitCode": 75,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.snapshot",
+          "causeCode": "TRANSIENT_NOT_STARTED",
+          "retryable": true
+        }
+      }
+    },
+    {
+      "name": "evidence-transient",
+      "argv": [
+        "evidence",
+        "--snapshot",
+        "{scratch}/snap.json",
+        "--lane",
+        "gmail",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 75,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.evidence",
+          "causeCode": "TRANSIENT_NOT_STARTED",
+          "retryable": true
+        }
+      }
+    },
+    {
+      "name": "apply-transient",
+      "argv": [
+        "apply",
+        "--plan",
+        "{scratch}/plan-c1.json",
+        "--seal",
+        "sha256:316fe7521ce2fd89879148f6c144d300ceba49a59c75c0ca970a7e05293aaee4",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 75,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "google-contacts.apply",
+          "causeCode": "TRANSIENT_NOT_STARTED",
+          "retryable": true
+        }
+      }
+    }
+  ]
+}

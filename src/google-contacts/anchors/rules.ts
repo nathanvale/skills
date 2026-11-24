@@ -3,6 +3,7 @@ import {
   compareCodeUnit,
   parseEmailAddress,
   parseOrganizationDomain,
+  stripNonContactSource,
 } from "../domain/rules.ts";
 import type {
   AuditDoc,
@@ -231,8 +232,9 @@ function auditContactPhones(
   defaultRegion: CountryCode,
   findings: AuditFinding[],
 ): void {
-  if (contact.phoneNumbers.length === 0) return;
-  const res = normalizeContactPhones(contact.phoneNumbers, defaultRegion);
+  const ownedPhones = stripNonContactSource(contact.phoneNumbers);
+  if (ownedPhones.length === 0) return;
+  const res = normalizeContactPhones(ownedPhones, defaultRegion);
   if (res.ambiguousValues.length > 0) {
     findings.push({
       id: `phone-ambiguous:${contact.resourceName}`,

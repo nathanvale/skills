@@ -3,6 +3,7 @@ import type {
   ProgramsCapability,
   RecordedEffect,
 } from "agent-cli-kernel";
+import { programDetails } from "agent-cli-kernel/addons/programs";
 import type { ContactRecord } from "./domain/rules.ts";
 import { buildGogBaseArgs, OUTPUT_LIMIT_MEDIUM, runGogDomain } from "./gog.ts";
 import type { GogRuntimeConfig } from "./gog.ts";
@@ -137,8 +138,14 @@ async function runUpdateSubBatches(params: ExecParams): Promise<boolean> {
       params.aborted,
       new TextEncoder().encode(json),
     );
-    if (res.kind === "unconfirmed") {
-      tracker.hardUnconfirmedReason = res.detail;
+    if (
+      res.kind === "unconfirmed" ||
+      programDetails(res.raw)?.stdoutTruncated === true
+    ) {
+      tracker.hardUnconfirmedReason =
+        res.kind === "unconfirmed"
+          ? res.detail
+          : `Update sub-batch ${String(batch.index)} stdout was truncated.`;
       return false;
     }
     if (res.kind !== "ok") {
@@ -177,8 +184,14 @@ async function runDeleteBatches(params: ExecParams): Promise<void> {
       params.config,
       params.aborted,
     );
-    if (res.kind === "unconfirmed") {
-      tracker.hardUnconfirmedReason = res.detail;
+    if (
+      res.kind === "unconfirmed" ||
+      programDetails(res.raw)?.stdoutTruncated === true
+    ) {
+      tracker.hardUnconfirmedReason =
+        res.kind === "unconfirmed"
+          ? res.detail
+          : `Delete batch ${String(delBatch.index)} stdout was truncated.`;
       return;
     }
     if (res.kind !== "ok") {
@@ -325,6 +338,6 @@ export function classifyReadBack(
     }
   }
   tracker.finalDisposition = "rejected";
-  tracker.summaryLine = `${tracker.cleanFailureDetail} Confirmed read-back: landed=${String(buckets.landed.length)}, untouched=${String(buckets.untouched.length)}, externalDrift=${String(buckets.driftedExternally.length)}.`;
+  tracker.summaryLine = `${tracker.cleanFailureDetail} Confirmed read-back: landed=[${buckets.landed.join(",")}], untouched=[${buckets.untouched.join(",")}], externalDrift=[${buckets.driftedExternally.join(",")}].`;
   return true;
 }

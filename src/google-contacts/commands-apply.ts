@@ -433,26 +433,15 @@ export function createApplyCommand(deps: ApplyCommandDeps) {
           },
         );
       }
-      if (
+      const isRejected =
         outcome.proof.transactionState === "completed" &&
-        tracker.finalDisposition === "rejected"
-      ) {
-        return context.result(
-          {
-            commandIdentity: "google-contacts.apply",
-            causeCode: "DOMAIN_CONTACTS_APPLY_REJECTED",
-          },
-          {
-            message: tracker.summaryLine,
-            data: null,
-            transaction: outcome.proof,
-          },
-        );
-      }
+        tracker.finalDisposition === "rejected";
       return context.result(
         {
           commandIdentity: "google-contacts.apply",
-          causeCode: "DOMAIN_CONTACTS_APPLY_UNCONFIRMED",
+          causeCode: isRejected
+            ? "DOMAIN_CONTACTS_APPLY_REJECTED"
+            : "DOMAIN_CONTACTS_APPLY_UNCONFIRMED",
         },
         {
           message: tracker.summaryLine,
