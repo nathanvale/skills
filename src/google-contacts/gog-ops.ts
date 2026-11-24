@@ -6,7 +6,7 @@ import {
   OUTPUT_LIMIT_LARGE,
   OUTPUT_LIMIT_SMALL,
   parseGogAuthList,
-  parseGogBatchGetResponse,
+  decodeGogBatchGetOutput,
   parseGogContactsListPage,
   parseSemver,
   resolveExecutablePath,
@@ -218,6 +218,21 @@ type BatchGetResult =
   | { readonly kind: "unavailable"; readonly detail: string }
   | { readonly kind: "unconfirmed"; readonly detail: string };
 
+const PERSON_NOT_FOUND_EXIT = 1;
+
+function batchGetStdoutJson(res: GogCallOutcome): unknown {
+  if (res.kind === "ok") return res.json;
+  if (res.kind !== "rejected" || res.exitCode !== PERSON_NOT_FOUND_EXIT) {
+    return undefined;
+  }
+  try {
+    const parsed: unknown = JSON.parse(res.raw.stdout);
+    return parsed;
+  } catch {
+    return undefined;
+  }
+}
+
 async function batchGetChunk(params: {
   readonly programs: ProgramsCapability;
   readonly executable: ParsedPath;
@@ -247,13 +262,23 @@ async function batchGetChunk(params: {
     params.config,
     params.aborted,
   );
-  if (res.kind === "empty" || res.kind === "not-found") {
-    return { kind: "ok", found: new Map(), missing: params.slice };
-  }
   if (res.kind === "transient" || res.kind === "unconfirmed") return res;
-  if (res.kind !== "ok") return { kind: "unavailable", detail: res.detail };
-  const parsed = parseGogBatchGetResponse(res.json, params.slice);
-  return { kind: "ok", found: parsed.found, missing: parsed.missing };
+  const exitDetail =
+    "detail" in res
+      ? res.detail
+      : "gog contacts batch get exited without a decodable result.";
+  const stdoutJson = batchGetStdoutJson(res);
+  if (stdoutJson === undefined) {
+    return { kind: "unavailable", detail: exitDetail };
+  }
+  const decoded = decodeGogBatchGetOutput(stdoutJson, params.slice);
+  if (decoded.kind === "unrecognised") {
+    return { kind: "unavailable", detail: decoded.detail };
+  }
+  if (res.kind !== "ok" && decoded.absent.length === 0) {
+    return { kind: "unavailable", detail: exitDetail };
+  }
+  return { kind: "ok", found: decoded.found, missing: decoded.absent };
 }
 
 export async function batchGetContacts(params: {
@@ -284,14 +309,69 @@ export async function batchGetContacts(params: {
   return { kind: "ok", found, missing };
 }
 
-export async function listAllContacts(params: {
+type ListParams = {
   readonly programs: ProgramsCapability;
   readonly executable: ParsedPath;
   readonly account: string;
   readonly client?: string | undefined;
   readonly config: GogRuntimeConfig;
   readonly aborted: () => boolean;
-}): Promise<
+};
+
+type ListPageResult =
+  | {
+      readonly kind: "page";
+      readonly contacts: readonly ContactRecord[];
+      readonly nextPageToken: string | null;
+    }
+  | { readonly kind: "transient"; readonly detail: string }
+  | { readonly kind: "unavailable"; readonly detail: string };
+
+async function listContactsPage(
+  params: ListParams,
+  pageToken: string | null,
+): Promise<ListPageResult> {
+  const args = [
+    "contacts",
+    "list",
+    "--max",
+    "100",
+    "--readonly",
+    ...(pageToken !== null ? ["--page", pageToken] : []),
+    ...buildGogBaseArgs({
+      enableCommand: "contacts.list",
+      account: params.account,
+      client: params.client,
+    }),
+  ];
+  const res: GogCallOutcome = await runGogInspect(
+    params.programs,
+    params.executable,
+    args,
+    OUTPUT_LIMIT_LARGE,
+    params.config,
+    params.aborted,
+  );
+  if (res.kind === "empty") {
+    return { kind: "page", contacts: [], nextPageToken: null };
+  }
+  if (res.kind === "transient" || res.kind === "unconfirmed") {
+    return { kind: "transient", detail: res.detail };
+  }
+  if (res.kind !== "ok") return { kind: "unavailable", detail: res.detail };
+  const parsed = parseGogContactsListPage(res.json);
+  return parsed === null
+    ? {
+        kind: "unavailable",
+        detail:
+          "gog contacts list returned a page that is not a contacts[] list of Person objects with resourceName and etag.",
+      }
+    : { kind: "page", ...parsed };
+}
+
+export async function listAllContacts(
+  params: ListParams,
+): Promise<
   | { readonly kind: "ok"; readonly contacts: readonly ContactRecord[] }
   | { readonly kind: "transient"; readonly detail: string }
   | { readonly kind: "unavailable"; readonly detail: string }
@@ -299,35 +379,10 @@ export async function listAllContacts(params: {
   const contacts: ContactRecord[] = [];
   let pageToken: string | null = null;
   for (let page = 0; page < 200; page += 1) {
-    const args = [
-      "contacts",
-      "list",
-      "--max",
-      "100",
-      "--readonly",
-      ...(pageToken !== null ? ["--page", pageToken] : []),
-      ...buildGogBaseArgs({
-        enableCommand: "contacts.list",
-        account: params.account,
-        client: params.client,
-      }),
-    ];
-    const res: GogCallOutcome = await runGogInspect(
-      params.programs,
-      params.executable,
-      args,
-      OUTPUT_LIMIT_LARGE,
-      params.config,
-      params.aborted,
-    );
-    if (res.kind === "empty") break;
-    if (res.kind === "transient" || res.kind === "unconfirmed") {
-      return { kind: "transient", detail: res.detail };
-    }
-    if (res.kind !== "ok") return { kind: "unavailable", detail: res.detail };
-    const parsed = parseGogContactsListPage(res.json);
-    for (const item of parsed.contacts) contacts.push(item);
-    pageToken = parsed.nextPageToken;
+    const res = await listContactsPage(params, pageToken);
+    if (res.kind !== "page") return res;
+    for (const item of res.contacts) contacts.push(item);
+    pageToken = res.nextPageToken;
     if (pageToken === null) break;
   }
   return { kind: "ok", contacts };

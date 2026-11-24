@@ -25,6 +25,7 @@ export type GogStubBehavior = {
   readonly listPages?: readonly (readonly ContactRecord[])[];
   readonly batchGetExit?: number;
   readonly batchGetExitByCall?: Readonly<Record<string, number>>;
+  readonly batchGetStdoutByCall?: Readonly<Record<string, string>>;
   readonly batchUpdateExit?: number;
   readonly failOnUpdateCall?: number;
   readonly failOnUpdateExit?: number;
@@ -197,11 +198,32 @@ if (args[0] === "contacts" && args[1] === "batch" && args[2] === "get") {
     if (idx !== -1) state.contacts[idx].etag = state.contacts[idx].etag + "-drifted";
     save();
   }
+  const rawStdout = b.batchGetStdoutByCall?.[String(state.batchGetCount)];
+  if (typeof rawStdout === "string") {
+    process.stdout.write(rawStdout);
+    process.exit(0);
+  }
   const requested = args.slice(3).filter((x) => x.startsWith("people/"));
-  const found = state.contacts.filter((c) => requested.includes(c.resourceName));
-  if (found.length === 0) process.exit(5);
-  process.stdout.write(JSON.stringify({ responses: found.map((person) => ({ person })) }));
-  process.exit(0);
+  const responses = requested.map((rn) => {
+    const person = state.contacts.find((c) => c.resourceName === rn);
+    return person
+      ? { httpStatusCode: 200, person, requestedResourceName: rn }
+      : { httpStatusCode: 404, requestedResourceName: rn, status: { code: 5, message: "Requested entity was not found." } };
+  });
+  const allFound = responses.every((item) => item.person !== undefined);
+  process.stdout.write(JSON.stringify({
+    operation: "get",
+    requested: requested.length,
+    completed: allFound ? requested.length : 0,
+    batches: [{
+      batch: 1,
+      resource_names: requested,
+      state: allFound ? "completed" : "unconfirmed",
+      response: { responses },
+      ...(allFound ? {} : { error: { message: "person response status 5: Requested entity was not found." } }),
+    }],
+  }));
+  process.exit(allFound ? 0 : 1);
 }
 if (args[0] === "contacts" && args[1] === "batch" && args[2] === "update") {
   state.batchUpdateCount = (state.batchUpdateCount ?? 0) + 1;

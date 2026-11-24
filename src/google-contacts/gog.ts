@@ -7,8 +7,14 @@ import type {
   RecordedEffect,
 } from "agent-cli-kernel";
 import { programDetails } from "agent-cli-kernel/addons/programs";
-import { decodeContactRecord } from "./decoders/rules.ts";
-import { asObject, ownArray, ownString, ownValue } from "./domain/rules.ts";
+import { decodeContactRecord, decodeStrictList } from "./decoders/rules.ts";
+import {
+  asObject,
+  ownArray,
+  ownNumber,
+  ownString,
+  ownValue,
+} from "./domain/rules.ts";
 import type { ContactRecord } from "./domain/rules.ts";
 
 export type PathBoundary = {
@@ -311,55 +317,119 @@ export function parseGogAuthList(
 export function parseGogContactsListPage(json: unknown): {
   readonly contacts: readonly ContactRecord[];
   readonly nextPageToken: string | null;
-} {
+} | null {
   const obj = asObject(json);
-  const rawList = Array.isArray(json)
-    ? json
-    : obj === null
-      ? []
-      : (ownArray(obj, "contacts") ??
-        ownArray(obj, "connections") ??
-        ownArray(obj, "people") ??
-        []);
-  const contacts: ContactRecord[] = [];
-  for (const item of rawList) {
-    const rec = decodeContactRecord(item);
-    if (rec !== null) contacts.push(rec);
-  }
-  const token = obj !== null ? ownString(obj, "nextPageToken") : null;
+  if (obj === null) return null;
+  const contacts = decodeStrictList(
+    ownArray(obj, "contacts"),
+    decodeContactRecord,
+  );
+  if (contacts === null) return null;
+  const token = ownString(obj, "nextPageToken");
   return {
     contacts,
     nextPageToken: token !== null && token.trim().length > 0 ? token : null,
   };
 }
 
-function extractBatchGetItems(json: unknown): readonly unknown[] {
-  if (Array.isArray(json)) return json;
-  const obj = asObject(json);
-  if (obj === null) return [];
-  const list =
-    ownArray(obj, "responses") ??
-    ownArray(obj, "contacts") ??
-    ownArray(obj, "people");
-  if (list !== null) return list;
-  return Object.keys(obj).map((key): unknown => Reflect.get(obj, key));
+export type BatchGetDecoding =
+  | {
+      readonly kind: "decoded";
+      readonly found: ReadonlyMap<string, ContactRecord>;
+      readonly absent: readonly string[];
+    }
+  | { readonly kind: "unrecognised"; readonly detail: string };
+
+type PersonResponseDecoding =
+  | {
+      readonly kind: "person";
+      readonly requested: string;
+      readonly record: ContactRecord;
+    }
+  | { readonly kind: "absent"; readonly requested: string };
+
+const NOT_FOUND_STATUS_CODE = 5;
+
+function decodePersonResponse(raw: unknown): PersonResponseDecoding | null {
+  const obj = asObject(raw);
+  if (obj === null) return null;
+  const requested = ownString(obj, "requestedResourceName");
+  if (requested === null) return null;
+  const person = ownValue(obj, "person");
+  if (person !== undefined) {
+    const record = decodeContactRecord(person);
+    return record !== null && record.resourceName === requested
+      ? { kind: "person", requested, record }
+      : null;
+  }
+  const status = asObject(ownValue(obj, "status"));
+  return status !== null && ownNumber(status, "code") === NOT_FOUND_STATUS_CODE
+    ? { kind: "absent", requested }
+    : null;
 }
 
-export function parseGogBatchGetResponse(
+function collectBatchGetPersonResponses(
+  json: unknown,
+): readonly unknown[] | null {
+  const obj = asObject(json);
+  if (obj === null || ownString(obj, "operation") !== "get") return null;
+  const batches = ownArray(obj, "batches");
+  if (batches === null || batches.length === 0) return null;
+  const items: unknown[] = [];
+  for (const batch of batches) {
+    const batchObj = asObject(batch);
+    const response =
+      batchObj === null ? null : asObject(ownValue(batchObj, "response"));
+    const responses =
+      response === null ? null : ownArray(response, "responses");
+    if (responses === null) return null;
+    for (const item of responses) items.push(item);
+  }
+  return items;
+}
+
+export function decodeGogBatchGetOutput(
   json: unknown,
   requested: readonly string[],
-): {
-  readonly found: ReadonlyMap<string, ContactRecord>;
-  readonly missing: readonly string[];
-} {
-  const found = new Map<string, ContactRecord>();
-  for (const candidate of extractBatchGetItems(json)) {
-    const obj = asObject(candidate);
-    if (obj === null) continue;
-    const person = ownValue(obj, "person");
-    const rec = decodeContactRecord(person !== undefined ? person : obj);
-    if (rec !== null) found.set(rec.resourceName, rec);
+): BatchGetDecoding {
+  const items = collectBatchGetPersonResponses(json);
+  if (items === null) {
+    return {
+      kind: "unrecognised",
+      detail:
+        "gog contacts batch get output is not the batches[].response.responses[] shape gog >= 0.48.1 emits.",
+    };
   }
-  const missing = requested.filter((rn) => !found.has(rn));
-  return { found, missing };
+  const wanted = new Set(requested);
+  const found = new Map<string, ContactRecord>();
+  const absent = new Set<string>();
+  for (const item of items) {
+    const decoded = decodePersonResponse(item);
+    if (
+      decoded === null ||
+      !wanted.has(decoded.requested) ||
+      found.has(decoded.requested) ||
+      absent.has(decoded.requested)
+    ) {
+      return {
+        kind: "unrecognised",
+        detail:
+          "gog contacts batch get returned a person response that is not a requested Contact with resourceName and etag, or a NOT_FOUND status.",
+      };
+    }
+    if (decoded.kind === "person") found.set(decoded.requested, decoded.record);
+    else absent.add(decoded.requested);
+  }
+  if (found.size + absent.size !== wanted.size) {
+    return {
+      kind: "unrecognised",
+      detail:
+        "gog contacts batch get output does not account for every requested Contact.",
+    };
+  }
+  return {
+    kind: "decoded",
+    found,
+    absent: requested.filter((rn) => absent.has(rn)),
+  };
 }
