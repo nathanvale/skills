@@ -1,9 +1,11 @@
 import type { ParsedPath, ProgramsCapability } from "agent-cli-kernel";
+import { decodeContactRecord } from "./decoders/rules.ts";
 import type { ContactRecord } from "./domain/rules.ts";
 import {
   buildGogBaseArgs,
   GOG_MIN_VERSION,
   OUTPUT_LIMIT_LARGE,
+  OUTPUT_LIMIT_MEDIUM,
   OUTPUT_LIMIT_SMALL,
   parseGogAuthList,
   decodeGogBatchGetOutput,
@@ -415,4 +417,65 @@ export async function listAllContacts(params: ListParams): Promise<
     if (record !== undefined) contacts.push(record);
   }
   return { kind: "ok", contacts, missing: fetched.missing };
+}
+
+const PROTECTED_READ_FIELDS = "fileAses,photos,skills,metadata";
+
+async function readProtectedContact(
+  params: ListParams,
+  resourceName: string,
+): Promise<
+  | { readonly kind: "ok"; readonly record: ContactRecord }
+  | { readonly kind: "transient"; readonly detail: string }
+  | { readonly kind: "unavailable"; readonly detail: string }
+> {
+  const res = await runGogInspect(
+    params.programs,
+    params.executable,
+    [
+      "contacts",
+      "raw",
+      resourceName,
+      "--person-fields",
+      PROTECTED_READ_FIELDS,
+      "--readonly",
+      ...buildGogBaseArgs({
+        enableCommand: "contacts.raw",
+        account: params.account,
+        client: params.client,
+      }),
+    ],
+    OUTPUT_LIMIT_MEDIUM,
+    params.config,
+    params.aborted,
+  );
+  if (res.kind === "transient" || res.kind === "unconfirmed") {
+    return { kind: "transient", detail: res.detail };
+  }
+  const record = res.kind === "ok" ? decodeContactRecord(res.json) : null;
+  return record !== null && record.resourceName === resourceName
+    ? { kind: "ok", record }
+    : {
+        kind: "unavailable",
+        detail: `gog contacts raw could not show ${resourceName}'s ${PROTECTED_READ_FIELDS} fields, which gog contacts batch get does not return.`,
+      };
+}
+
+export async function readProtectedContacts(
+  params: ListParams & { readonly resourceNames: readonly string[] },
+): Promise<
+  | {
+      readonly kind: "ok";
+      readonly records: ReadonlyMap<string, ContactRecord>;
+    }
+  | { readonly kind: "transient"; readonly detail: string }
+  | { readonly kind: "unavailable"; readonly detail: string }
+> {
+  const records = new Map<string, ContactRecord>();
+  for (const resourceName of params.resourceNames) {
+    const res = await readProtectedContact(params, resourceName);
+    if (res.kind !== "ok") return res;
+    records.set(resourceName, res.record);
+  }
+  return { kind: "ok", records };
 }

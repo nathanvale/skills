@@ -177,6 +177,19 @@ if (args[0] === "contacts" && args[1] === "list") {
   process.stdout.write(JSON.stringify({ contacts: (pages[pageIndex] ?? []).map(summary), nextPageToken: nextToken }));
   process.exit(0);
 }
+const BATCH_READ_FIELDS = "addresses,biographies,birthdays,calendarUrls,clientData,emailAddresses,events,externalIds,genders,imClients,interests,locales,locations,memberships,miscKeywords,names,nicknames,occupations,organizations,phoneNumbers,relations,sipAddresses,urls,userDefined,metadata";
+const projectPerson = (person, fields) => {
+  const keep = new Set(["resourceName", "etag", ...fields.split(",")]);
+  return Object.fromEntries(Object.entries(person).filter(([key]) => keep.has(key)));
+};
+if (args[0] === "contacts" && args[1] === "raw") {
+  const person = state.contacts.find((c) => c.resourceName === args[2]);
+  if (!person) process.exit(5);
+  const maskIdx = args.indexOf("--person-fields");
+  if (maskIdx === -1) process.exit(2);
+  process.stdout.write(JSON.stringify(projectPerson(person, args[maskIdx + 1])));
+  process.exit(0);
+}
 if (args[0] === "contacts" && args[1] === "batch" && args[2] === "get") {
   state.batchGetCount = (state.batchGetCount ?? 0) + 1;
   save();
@@ -203,7 +216,8 @@ if (args[0] === "contacts" && args[1] === "batch" && args[2] === "get") {
   const requested = args.slice(3).filter((x) => x.startsWith("people/"));
   const failed = b.failPersonOnCall?.call === state.batchGetCount ? b.failPersonOnCall : null;
   const responses = requested.map((rn) => {
-    const person = state.contacts.find((c) => c.resourceName === rn);
+    const stored = state.contacts.find((c) => c.resourceName === rn);
+    const person = stored ? projectPerson(stored, BATCH_READ_FIELDS) : undefined;
     if (person && failed?.resourceName === rn) {
       return { httpStatusCode: failed.httpStatusCode, person, requestedResourceName: rn, status: { code: failed.code, message: "Internal error encountered." } };
     }

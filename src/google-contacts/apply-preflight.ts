@@ -1,8 +1,14 @@
 import type { ParsedPath, ProgramsCapability } from "agent-cli-kernel";
 import type { stateAddon } from "agent-cli-kernel/addons/state";
 import { SCHEMA_INVALID_INPUT, TRANSIENT_NOT_STARTED } from "./causes.ts";
+import { compareCodeUnit } from "./domain/rules.ts";
+import type { ContactRecord } from "./domain/rules.ts";
 import type { GogRuntimeConfig, PathBoundary } from "./gog.ts";
-import { batchGetContacts, probeGogReadiness } from "./gog-ops.ts";
+import {
+  batchGetContacts,
+  probeGogReadiness,
+  readProtectedContacts,
+} from "./gog-ops.ts";
 import { readJsonFile } from "./inputs.ts";
 import type { LedgerResolution } from "./ledger.ts";
 import { decodeMutationPlanDoc } from "./plan-decoders/rules.ts";
@@ -101,6 +107,58 @@ function validateOfflinePlanFile(
   return { ok: true, plan };
 }
 
+async function withProtectedDuplicateFields(params: {
+  readonly plan: MutationPlanDoc;
+  readonly live: ReadonlyMap<string, ContactRecord>;
+  readonly read: (
+    resourceNames: readonly string[],
+  ) => ReturnType<typeof readProtectedContacts>;
+}): Promise<
+  | { readonly ok: true; readonly live: ReadonlyMap<string, ContactRecord> }
+  | { readonly ok: false; readonly failure: PreflightFailure }
+> {
+  const duplicates = params.plan.mergeClusters.flatMap((cluster) =>
+    cluster.duplicates.map((dup) => dup.resourceName),
+  );
+  if (duplicates.length === 0) return { ok: true, live: params.live };
+  const read = await params.read(duplicates);
+  if (read.kind !== "ok") {
+    return {
+      ok: false,
+      failure: {
+        cause:
+          read.kind === "transient"
+            ? TRANSIENT_NOT_STARTED
+            : "DOMAIN_CONTACTS_GOG_UNAVAILABLE",
+        message: read.detail,
+      },
+    };
+  }
+  const live = new Map(params.live);
+  for (const resourceName of duplicates) {
+    const current = live.get(resourceName);
+    const shown = read.records.get(resourceName);
+    if (current === undefined || shown?.etag !== current.etag) {
+      return {
+        ok: false,
+        failure: {
+          cause: "DOMAIN_CONTACTS_REVISION_DRIFT",
+          message: `Contact ${resourceName} revision drifted between its batch read and its protected-field read.`,
+        },
+      };
+    }
+    const fields = new Set([
+      ...current.nonAllowlistedFields,
+      ...shown.nonAllowlistedFields,
+    ]);
+    live.set(resourceName, {
+      ...current,
+      nonAllowlistedFields: [...fields].sort(compareCodeUnit),
+    });
+  }
+  return { ok: true, live };
+}
+
 export async function runApplyPreflight(params: {
   readonly planPath: string;
   readonly seal: string;
@@ -144,9 +202,10 @@ export async function runApplyPreflight(params: {
       },
     };
   }
+  const executable = probe.parsedPath;
   const live = await batchGetContacts({
     programs: params.programs,
-    executable: probe.parsedPath,
+    executable,
     account: plan.account,
     client: params.client,
     resourceNames: plan.targets.map((target) => target.resourceName),
@@ -180,12 +239,27 @@ export async function runApplyPreflight(params: {
       };
     }
   }
-  const liveErr = verifyPlanAgainstLive(plan, live.found);
+  const protectedLive = await withProtectedDuplicateFields({
+    plan,
+    live: live.found,
+    read: (resourceNames) =>
+      readProtectedContacts({
+        programs: params.programs,
+        executable,
+        account: plan.account,
+        client: params.client,
+        config: params.deps.gogConfig,
+        aborted: params.aborted,
+        resourceNames,
+      }),
+  });
+  if (!protectedLive.ok) return protectedLive;
+  const liveErr = verifyPlanAgainstLive(plan, protectedLive.live);
   if (liveErr !== null) {
     return {
       ok: false,
       failure: { cause: "DOMAIN_CONTACTS_PLAN_INVALID", message: liveErr },
     };
   }
-  return { ok: true, plan, executable: probe.parsedPath };
+  return { ok: true, plan, executable };
 }

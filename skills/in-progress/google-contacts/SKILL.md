@@ -84,6 +84,7 @@ bun <skill-dir>/dist/cli.mjs apply \
   --json
 ```
 
+- For `duplicate-merge`, `apply` also reads each `Duplicate contact`'s `photos`, `skills` and `fileAses` with `gog contacts raw`, because `gog contacts batch get` does not return them. A `Duplicate contact` holding any of them is refused with `DOMAIN_CONTACTS_PLAN_INVALID`; if `gog` cannot show them, `apply` refuses with `DOMAIN_CONTACTS_GOG_UNAVAILABLE`. Merge such a Contact by hand.
 - On `DOMAIN_CONTACTS_REVISION_DRIFT` or `DOMAIN_CONTACTS_APPLY_REJECTED`: capture a fresh `snapshot`, recompile `plan`, re-review diffs, and obtain fresh confirmation.
 - On `DOMAIN_CONTACTS_APPLY_UNCONFIRMED`, `DOMAIN_CONTACTS_APPLY_UNRESOLVED`, or `DOMAIN_CONTACTS_APPLY_HELD`: run zero-argument `pending` to inspect affected `<accountKey>:<resourceName>` targets and expected Contact revisions:
 
