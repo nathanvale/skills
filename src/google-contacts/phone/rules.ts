@@ -156,3 +156,11 @@ export function planPhoneNormalization(
     ambiguousValues,
   };
 }
+
+export function phoneMatchesE164(rawValue: string, e164Value: string): boolean {
+  if (rawValue.trim() === e164Value) return true;
+  const region = parsePhoneNumberFromString(e164Value)?.country;
+  if (region === undefined) return false;
+  const res = normalizePhoneValue(rawValue, region);
+  return res.kind !== "ambiguous" && res.e164.value === e164Value;
+}

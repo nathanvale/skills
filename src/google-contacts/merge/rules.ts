@@ -366,6 +366,32 @@ function buildTypedMergePatch(
   };
 }
 
+function mergeProvenanceLine(duplicateNames: readonly string[]): string {
+  return `[merged-from] ${[...duplicateNames].sort(compareCodeUnit).join(", ")}`;
+}
+
+export function deriveMergedSurvivorFields(
+  survivor: ContactRecord,
+  duplicates: readonly ContactRecord[],
+):
+  | {
+      readonly ok: true;
+      readonly fields: ContactWireFields;
+      readonly provenanceLine: string;
+    }
+  | { readonly ok: false; readonly reason: string } {
+  const validationError = validateMergeDuplicates(survivor, duplicates);
+  if (validationError !== null) return { ok: false, reason: validationError };
+  const provenanceLine = mergeProvenanceLine(
+    duplicates.map((dup) => dup.resourceName),
+  );
+  return {
+    ok: true,
+    fields: buildMergedFields(survivor, duplicates, provenanceLine),
+    provenanceLine,
+  };
+}
+
 export type MergeComputationResult =
   | {
       readonly ok: true;
@@ -419,10 +445,9 @@ export function computeDuplicateMerge(params: {
       reason: "Human confirmation marker requires a non-empty reason.",
     };
   }
-  const dupIds = params.duplicates
-    .map((dup) => dup.resourceName)
-    .sort(compareCodeUnit);
-  const provenanceLine = `[merged-from] ${dupIds.join(", ")}`;
+  const provenanceLine = mergeProvenanceLine(
+    params.duplicates.map((dup) => dup.resourceName),
+  );
   const firstShared = sharedAll[0] ?? [];
   const patch = buildTypedMergePatch(
     params.survivor,

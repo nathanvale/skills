@@ -11,6 +11,7 @@ import {
 import type { ContactRecord } from "../domain/rules.ts";
 import { MERGE_ALLOWLIST_FIELDS } from "../merge/rules.ts";
 import { writableSubfieldKeys } from "../person-fields/rules.ts";
+import { validatePlanMembership } from "../plan-integrity/rules.ts";
 import type { ContactListField } from "../person-fields/rules.ts";
 import {
   fieldMaskOf,
@@ -369,7 +370,8 @@ export function validateMutationPlan(plan: MutationPlanDoc): string | null {
   if (delErr !== null) return delErr;
   return (
     validateTargetRevisions(plan, seenUpdates, deleteMap) ??
-    validateMergeClusters(plan, seenUpdates, deleteMap)
+    validateMergeClusters(plan, seenUpdates, deleteMap) ??
+    validatePlanMembership(plan)
   );
 }
 

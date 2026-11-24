@@ -6,6 +6,7 @@ import { batchGetContacts, probeGogReadiness } from "./gog-ops.ts";
 import { readJsonFile } from "./inputs.ts";
 import type { LedgerResolution } from "./ledger.ts";
 import { decodeMutationPlanDoc } from "./plan-decoders/rules.ts";
+import { verifyPlanAgainstLive } from "./plan-integrity/rules.ts";
 import type { MutationPlanDoc } from "./plan-types/rules.ts";
 import {
   validateMutationPlan,
@@ -178,6 +179,13 @@ export async function runApplyPreflight(params: {
         },
       };
     }
+  }
+  const liveErr = verifyPlanAgainstLive(plan, live.found);
+  if (liveErr !== null) {
+    return {
+      ok: false,
+      failure: { cause: "DOMAIN_CONTACTS_PLAN_INVALID", message: liveErr },
+    };
   }
   return { ok: true, plan, executable: probe.parsedPath };
 }
