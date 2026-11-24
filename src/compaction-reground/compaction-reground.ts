@@ -1,12 +1,14 @@
 import {
+  chmodSync,
   closeSync,
+  constants,
   lstatSync,
   mkdirSync,
   openSync,
   readSync,
   renameSync,
   unlinkSync,
-  writeFileSync,
+  writeSync,
 } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 
@@ -16,17 +18,16 @@ const ROSTER_FOLDER_NAME = "coordinator-roster";
 const CURSOR_FOLDER_NAME = "compaction-cursors";
 const ROSTER_HEAD_BYTES = 256;
 const CURSOR_HEAD_BYTES = 512;
-const CURSOR_TAIL_BYTES = 32;
 const TRANSCRIPT_CHUNK_BYTES = 256 * 1024;
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 const COORDINATOR_FOLDER_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
-const TAIL_HEX_PATTERN = /^[0-9a-f]{0,64}$/;
+const PREFIX_SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const ANTIGRAVITY_EMPTY_OUTPUT = "{}";
 
 interface CompactionCursor {
   lastCheckpointStep: number;
   lastScannedBytes: number;
-  tailHex: string;
+  prefixSha256: string;
 }
 
 interface ScanAccumulator {
@@ -42,7 +43,7 @@ interface AntigravityRequest {
 const EMPTY_CURSOR: CompactionCursor = {
   lastCheckpointStep: -1,
   lastScannedBytes: 0,
-  tailHex: "",
+  prefixSha256: "",
 };
 
 function regroundText(stateFolder: string, folder: string | null): string {
@@ -133,13 +134,28 @@ function readSlice(path: string, offset: number, length: number): Buffer {
   }
 }
 
-function readTailHex(path: string, endOffset: number): string | null {
-  if (endOffset <= 0) {
+function sha256Prefix(path: string, byteCount: number): string | null {
+  if (byteCount === 0) {
     return "";
   }
-  const length = Math.min(CURSOR_TAIL_BYTES, endOffset);
-  const slice = readSlice(path, endOffset - length, length);
-  return slice.length === length ? slice.toString("hex") : null;
+  const fd = openSync(path, "r");
+  const hasher = new Bun.CryptoHasher("sha256");
+  const chunk = Buffer.alloc(Math.min(TRANSCRIPT_CHUNK_BYTES, byteCount));
+  let totalRead = 0;
+  try {
+    while (totalRead < byteCount) {
+      const toRead = Math.min(chunk.length, byteCount - totalRead);
+      const bytesRead = readSync(fd, chunk, 0, toRead, totalRead);
+      if (bytesRead <= 0) {
+        break;
+      }
+      hasher.update(chunk.subarray(0, bytesRead));
+      totalRead += bytesRead;
+    }
+  } finally {
+    closeSync(fd);
+  }
+  return totalRead === byteCount ? hasher.digest("hex") : null;
 }
 
 function coordinatorFolder(path: string): string | null {
@@ -192,11 +208,10 @@ function antigravityRequest(
   };
 }
 
-function validTailHex(value: unknown, bytes: number): string {
-  const expected = Math.min(CURSOR_TAIL_BYTES, bytes) * 2;
-  return typeof value === "string" &&
-    value.length === expected &&
-    TAIL_HEX_PATTERN.test(value)
+function validPrefixSha256(value: unknown, bytes: number): string {
+  return bytes > 0 &&
+    typeof value === "string" &&
+    PREFIX_SHA256_PATTERN.test(value)
     ? value
     : "";
 }
@@ -211,15 +226,14 @@ function readCursor(path: string): CompactionCursor {
     if (!isJsonObject(parsed)) {
       return EMPTY_CURSOR;
     }
-    const step = parsed.lastCheckpointStep;
-    const bytes = parsed.lastScannedBytes;
+    const { lastCheckpointStep: step, lastScannedBytes: bytes } = parsed;
     if (!isSafeIntegerAtLeast(step, -1) || !isSafeIntegerAtLeast(bytes, 0)) {
       return EMPTY_CURSOR;
     }
     return {
       lastCheckpointStep: step,
       lastScannedBytes: bytes,
-      tailHex: validTailHex(parsed.tailHex, bytes),
+      prefixSha256: validPrefixSha256(parsed.prefixSha256, bytes),
     };
   } catch {
     return EMPTY_CURSOR;
@@ -234,6 +248,13 @@ function cleanupStaging(staging: string): void {
   }
 }
 
+function tightenFolderMode(folder: string): void {
+  const mode = lstatSync(folder).mode & 0o777;
+  if ((mode & 0o200) !== 0 && (mode & 0o077) !== 0) {
+    chmodSync(folder, mode & 0o700);
+  }
+}
+
 function writeCursor(
   folder: string,
   conversationId: string,
@@ -242,14 +263,21 @@ function writeCursor(
   const target = join(folder, conversationId);
   const nonce = `${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2, 10)}`;
   const staging = join(folder, `.${conversationId}.${nonce}.tmp`);
+  const flags = constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY;
   let createdStaging = false;
   try {
     mkdirSync(folder, { recursive: true, mode: 0o700 });
-    writeFileSync(staging, `${JSON.stringify(cursor)}\n`, {
-      flag: "wx",
-      mode: 0o600,
-    });
+    tightenFolderMode(folder);
+    const payload = Buffer.from(`${JSON.stringify(cursor)}\n`);
+    const fd = openSync(staging, flags, 0o600);
     createdStaging = true;
+    try {
+      if (writeSync(fd, payload, 0, payload.length) !== payload.length) {
+        throw new Error("Short cursor write");
+      }
+    } finally {
+      closeSync(fd);
+    }
     renameSync(staging, target);
     return true;
   } catch {
@@ -339,31 +367,30 @@ function isTranscriptRewound(
   fileSize: number,
   cursor: CompactionCursor,
 ): boolean {
-  if (fileSize < cursor.lastScannedBytes) {
-    return true;
-  }
-  if (cursor.lastScannedBytes === 0) {
-    return false;
-  }
-  return readTailHex(path, cursor.lastScannedBytes) !== cursor.tailHex;
+  return (
+    fileSize < cursor.lastScannedBytes ||
+    (cursor.lastScannedBytes > 0 &&
+      sha256Prefix(path, cursor.lastScannedBytes) !== cursor.prefixSha256)
+  );
 }
 
 function cursorsEqual(a: CompactionCursor, b: CompactionCursor): boolean {
   return (
     a.lastCheckpointStep === b.lastCheckpointStep &&
     a.lastScannedBytes === b.lastScannedBytes &&
-    a.tailHex === b.tailHex
+    a.prefixSha256 === b.prefixSha256
   );
 }
 
 function antigravityOutput(state: string, request: AntigravityRequest): string {
-  const entry = join(state, ROSTER_FOLDER_NAME, request.conversationId);
+  const { conversationId, transcriptPath } = request;
+  const entry = join(state, ROSTER_FOLDER_NAME, conversationId);
   if (regularFileSize(entry) === null) {
     return ANTIGRAVITY_EMPTY_OUTPUT;
   }
-  const fileSize = regularFileSize(request.transcriptPath);
+  const fileSize = regularFileSize(transcriptPath);
   const cursorFolder = join(state, CURSOR_FOLDER_NAME);
-  const cursorPath = join(cursorFolder, request.conversationId);
+  const cursorPath = join(cursorFolder, conversationId);
   if (
     fileSize === null ||
     !isUsableEntry(cursorFolder, "directory") ||
@@ -373,45 +400,42 @@ function antigravityOutput(state: string, request: AntigravityRequest): string {
   }
 
   const cursor = readCursor(cursorPath);
-  const rewound = isTranscriptRewound(request.transcriptPath, fileSize, cursor);
+  const rewound = isTranscriptRewound(transcriptPath, fileSize, cursor);
   if (!rewound && fileSize === cursor.lastScannedBytes) {
     return ANTIGRAVITY_EMPTY_OUTPUT;
   }
 
-  const scan = scanTranscriptFromOffset(
-    request.transcriptPath,
-    rewound ? 0 : cursor.lastScannedBytes,
-    fileSize,
-  );
-  const nextTailHex = readTailHex(request.transcriptPath, scan.consumedBytes);
-  if (nextTailHex === null) {
+  const startOffset = rewound ? 0 : cursor.lastScannedBytes;
+  const scan = scanTranscriptFromOffset(transcriptPath, startOffset, fileSize);
+  const nextPrefixSha256 = sha256Prefix(transcriptPath, scan.consumedBytes);
+  if (nextPrefixSha256 === null) {
     return ANTIGRAVITY_EMPTY_OUTPUT;
   }
 
   const shouldFire =
     !rewound && scan.maxCheckpointStep > cursor.lastCheckpointStep;
+  const systemMessage = shouldFire
+    ? regroundText(state, coordinatorFolder(entry))
+    : null;
   const nextCursor: CompactionCursor = {
     lastCheckpointStep:
       rewound || shouldFire
         ? scan.maxCheckpointStep
         : cursor.lastCheckpointStep,
     lastScannedBytes: scan.consumedBytes,
-    tailHex: nextTailHex,
+    prefixSha256: nextPrefixSha256,
   };
   if (
     !cursorsEqual(cursor, nextCursor) &&
-    !writeCursor(cursorFolder, request.conversationId, nextCursor)
+    !writeCursor(cursorFolder, conversationId, nextCursor)
   ) {
     return ANTIGRAVITY_EMPTY_OUTPUT;
   }
-  if (!shouldFire) {
-    return ANTIGRAVITY_EMPTY_OUTPUT;
-  }
-
-  const systemMessage = regroundText(state, coordinatorFolder(entry));
-  return JSON.stringify({
-    injectSteps: [{ systemMessage: { systemMessage } }],
-  });
+  return systemMessage === null
+    ? ANTIGRAVITY_EMPTY_OUTPUT
+    : JSON.stringify({
+        injectSteps: [{ systemMessage: { systemMessage } }],
+      });
 }
 
 function claudeOutput(state: string, sessionId: string): string | null {
@@ -444,11 +468,10 @@ function regroundHookOutputLine(
   }
 
   const agyRequest = antigravityRequest(input);
-  if (agyRequest) {
-    return antigravityOutput(state, agyRequest);
-  }
-  if (isAntigravity) {
-    return ANTIGRAVITY_EMPTY_OUTPUT;
+  if (agyRequest || isAntigravity) {
+    return agyRequest
+      ? antigravityOutput(state, agyRequest)
+      : ANTIGRAVITY_EMPTY_OUTPUT;
   }
 
   const sessionId = claudeSessionId(input);

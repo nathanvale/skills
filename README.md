@@ -69,7 +69,7 @@ After a coordinator session compacts its context, this plugin puts a short regro
 Both platforms share the same coordinator roster, state folder, shell wrapper (`hooks/coordinator/compaction-reground.sh`), and reground wording:
 
 - **Claude Code** loads `hooks/claude/hooks.json`, which runs on `SessionStart` (`compact`) and returns `hookSpecificOutput.additionalContext`.
-- **Antigravity** loads root `hooks.json` (`coordinator-compaction-reground`), which runs on `PreInvocation`. For rostered conversations, the hook scans `transcriptPath` from its saved byte offset for new completed `CHECKPOINT` steps. It injects `injectSteps[0].systemMessage.systemMessage` once per compaction and saves the compaction cursor in `<state folder>/compaction-cursors/<conversationId>`. Non-rostered conversations exit with `{}` and never create `compaction-cursors/`. If `/rewind` truncates a transcript, the cursor resets without a repeat injection and fires again on the next `CHECKPOINT`.
+- **Antigravity** loads root `hooks.json` (`coordinator-compaction-reground`), which runs on `PreInvocation`. For rostered conversations, the hook scans `transcriptPath` from its saved byte offset for new completed `CHECKPOINT` steps. It injects `injectSteps[0].systemMessage.systemMessage` once per compaction and saves the compaction cursor in `<state folder>/compaction-cursors/<conversationId>`. Non-rostered conversations exit with `{}` and never create `compaction-cursors/`. If `/rewind` truncates or rewrites a transcript, the `prefixSha256` continuity hash mismatch resets the cursor without a repeat injection and fires again on the next `CHECKPOINT`.
 
 The hook reads one state folder:
 

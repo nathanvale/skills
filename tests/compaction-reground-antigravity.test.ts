@@ -86,6 +86,10 @@ function checkpointStep(stepIndex: number, status: string = "DONE"): string {
   return `${JSON.stringify({ step_index: stepIndex, type: "CHECKPOINT", source: "SYSTEM", status, content: "# Resuming from a compaction" })}\n`;
 }
 
+function sha256Hex(data: Buffer): string {
+  return new Bun.CryptoHasher("sha256").update(data).digest("hex");
+}
+
 function createFixture(
   folderName: string | null = COORDINATOR_NAME,
   conversationId: string = CONVERSATION_ID,
@@ -245,7 +249,7 @@ describe("Antigravity compaction detection and cursor lifecycle", () => {
     expect(JSON.parse(readFileSync(cursorFile, "utf8"))).toEqual({
       lastCheckpointStep: 6,
       lastScannedBytes: bytes.length,
-      tailHex: bytes.subarray(Math.max(0, bytes.length - 32)).toString("hex"),
+      prefixSha256: sha256Hex(bytes),
     });
 
     expectEmptyAgy(invokeWrapper(agyPayload(transcriptFile), env));
@@ -274,7 +278,7 @@ describe("Antigravity compaction detection and cursor lifecycle", () => {
     expect(JSON.parse(readFileSync(cursorFile, "utf8"))).toEqual({
       lastCheckpointStep: 15,
       lastScannedBytes: bytes.length,
-      tailHex: bytes.subarray(Math.max(0, bytes.length - 32)).toString("hex"),
+      prefixSha256: sha256Hex(bytes),
     });
     expectEmptyAgy(invokeWrapper(agyPayload(transcriptFile), env));
   });

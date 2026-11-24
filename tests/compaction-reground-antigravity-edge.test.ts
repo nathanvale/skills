@@ -28,7 +28,7 @@ interface Fixture {
 interface StoredCursor {
   lastCheckpointStep: number;
   lastScannedBytes: number;
-  tailHex?: string;
+  prefixSha256?: string;
 }
 
 const repoRoot = join(import.meta.dir, "..");
@@ -188,6 +188,10 @@ function readStoredCursor(stateDir: string): StoredCursor {
   return JSON.parse(readFileSync(cursorFile, "utf8")) as StoredCursor;
 }
 
+function sha256Hex(data: Buffer): string {
+  return new Bun.CryptoHasher("sha256").update(data).digest("hex");
+}
+
 function paddingLinesToTarget(targetBytes: number): string {
   const baseLine = userStep(1, "x".repeat(1000));
   const baseLength = Buffer.byteLength(baseLine);
@@ -283,6 +287,47 @@ describe("Antigravity cursor persistence fail-closed guards", () => {
     const cursorsDir = join(stateDir, "compaction-cursors");
     expect(lstatSync(cursorsDir).mode & 0o777).toBe(0o700);
   });
+
+  test("tightens existing 0755 compaction-cursors directory to 0700 and writes 0600 cursor", () => {
+    const { stateDir, transcriptFile } = createFixture();
+    appendFileSync(transcriptFile, checkpointStep(3));
+    const cursorsDir = join(stateDir, "compaction-cursors");
+    mkdirSync(cursorsDir, { recursive: true });
+    chmodSync(cursorsDir, 0o755);
+    expect(lstatSync(cursorsDir).mode & 0o777).toBe(0o755);
+
+    expectInjected(
+      invokeWrapper(agyPayload(transcriptFile), agyEnv(stateDir)),
+      stateDir,
+    );
+    expect(lstatSync(cursorsDir).mode & 0o777).toBe(0o700);
+    expect(lstatSync(join(cursorsDir, CONVERSATION_ID)).mode & 0o777).toBe(
+      0o600,
+    );
+  });
+
+  test("does not persist cursor when roster entry is 0000 and fires once after chmod 0600", () => {
+    const { stateDir, transcriptFile } = createFixture();
+    appendFileSync(transcriptFile, checkpointStep(6));
+    const rosterFile = join(stateDir, "coordinator-roster", CONVERSATION_ID);
+    const cursorFile = join(stateDir, "compaction-cursors", CONVERSATION_ID);
+    const env = agyEnv(stateDir);
+    chmodSync(rosterFile, 0o000);
+    lockedFolders.push(rosterFile);
+
+    expectEmptyAgy(invokeWrapper(agyPayload(transcriptFile), env));
+    expect(existsSync(cursorFile)).toBe(false);
+
+    chmodSync(rosterFile, 0o600);
+    expectInjected(invokeWrapper(agyPayload(transcriptFile), env), stateDir);
+    const bytes = readFileSync(transcriptFile);
+    expect(readStoredCursor(stateDir)).toEqual({
+      lastCheckpointStep: 6,
+      lastScannedBytes: bytes.length,
+      prefixSha256: sha256Hex(bytes),
+    });
+    expectEmptyAgy(invokeWrapper(agyPayload(transcriptFile), env));
+  });
 });
 
 describe("Antigravity chunk boundary, rewind continuity, and wrapper fallback", () => {
@@ -370,6 +415,56 @@ describe("Antigravity chunk boundary, rewind continuity, and wrapper fallback", 
     appendFileSync(transcriptFile, checkpointStep(10));
     expectInjected(invokeWrapper(agyPayload(transcriptFile), env), stateDir);
     expect(readStoredCursor(stateDir).lastCheckpointStep).toBe(10);
+  });
+
+  test("detects same-tail same-size and same-tail regrown rewrites via prefixSha256", () => {
+    const { stateDir, transcriptFile } = createFixture();
+    const env = agyEnv(stateDir);
+    const initial = userStep(0) + checkpointStep(14);
+    const initialBuf = Buffer.from(initial);
+    writeFileSync(transcriptFile, initial);
+    expectInjected(invokeWrapper(agyPayload(transcriptFile), env), stateDir);
+
+    const sameTailSameSize = userStep(0) + checkpointStep(10);
+    const sameSizeBuf = Buffer.from(sameTailSameSize);
+    expect(sameSizeBuf.length).toBe(initialBuf.length);
+    expect(sameSizeBuf.subarray(-32).equals(initialBuf.subarray(-32))).toBe(
+      true,
+    );
+    writeFileSync(transcriptFile, sameTailSameSize);
+    expectEmptyAgy(invokeWrapper(agyPayload(transcriptFile), env));
+    expect(readStoredCursor(stateDir)).toEqual({
+      lastCheckpointStep: 10,
+      lastScannedBytes: sameSizeBuf.length,
+      prefixSha256: sha256Hex(sameSizeBuf),
+    });
+
+    appendFileSync(transcriptFile, checkpointStep(12));
+    expectInjected(invokeWrapper(agyPayload(transcriptFile), env), stateDir);
+    expect(readStoredCursor(stateDir).lastCheckpointStep).toBe(12);
+
+    const beforeRegrow = readFileSync(transcriptFile);
+    const regrownBase = userStep(0) + checkpointStep(10) + checkpointStep(11);
+    const regrown = regrownBase + userStep(13, "r".repeat(64));
+    const regrownBuf = Buffer.from(regrown);
+    expect(regrownBuf.length).toBeGreaterThan(beforeRegrow.length);
+    expect(
+      regrownBuf
+        .subarray(beforeRegrow.length - 32, beforeRegrow.length)
+        .equals(beforeRegrow.subarray(-32)),
+    ).toBe(true);
+    writeFileSync(transcriptFile, regrown);
+    expectEmptyAgy(invokeWrapper(agyPayload(transcriptFile), env));
+    expect(readStoredCursor(stateDir)).toEqual({
+      lastCheckpointStep: 11,
+      lastScannedBytes: regrownBuf.length,
+      prefixSha256: sha256Hex(regrownBuf),
+    });
+
+    appendFileSync(transcriptFile, checkpointStep(12));
+    expectInjected(invokeWrapper(agyPayload(transcriptFile), env), stateDir);
+    expect(readStoredCursor(stateDir).lastCheckpointStep).toBe(12);
+    expectEmptyAgy(invokeWrapper(agyPayload(transcriptFile), env));
   });
 
   test("runs shipped --antigravity wrapper with ANTIGRAVITY_CONVERSATION_ID unset", () => {

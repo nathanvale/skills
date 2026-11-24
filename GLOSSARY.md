@@ -17,5 +17,5 @@ The list, kept in the state folder, of sessions registered as coordinators. Each
 _Avoid_: Registry, allowlist
 
 **Compaction cursor**:
-The per-conversation JSON file under `<state folder>/compaction-cursors/<conversationId>` that stores the last handled `CHECKPOINT` step index and scanned byte offset for an Antigravity transcript. The hook uses it to fire one coordinator reground per compaction and resets it when a transcript rewinds. See the README's [Hooks](./README.md#hooks) section.
+The per-conversation JSON file under `<state folder>/compaction-cursors/<conversationId>` that stores the last handled `CHECKPOINT` step index, scanned byte offset, and `prefixSha256` continuity hash for an Antigravity transcript. The hook uses it to fire one coordinator reground per compaction and resets it when a transcript truncates or rewrites. See the README's [Hooks](./README.md#hooks) section.
 _Avoid_: Checkpoint cache, transcript offset, scan state
