@@ -120,7 +120,13 @@ export type PlanLeakGuard = {
   readonly privatePhones: readonly string[];
   readonly personalEmails: readonly string[];
   readonly bareNames: readonly string[];
+  readonly anchoredNames: readonly AnchoredName[];
   readonly streetAddresses: readonly string[];
+};
+
+export type AnchoredName = {
+  readonly name: string;
+  readonly anchors: readonly string[];
 };
 
 export type MutationPlanBody = {

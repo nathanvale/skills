@@ -160,46 +160,81 @@ export function buildWebResearchQueue(
   return entries;
 }
 
+type LeakTermSets = {
+  readonly phones: Set<string>;
+  readonly emails: Set<string>;
+  readonly bareNames: Set<string>;
+  readonly anchoredNames: Map<string, Set<string>>;
+  readonly streets: Set<string>;
+};
+
+function eligibleAnchorTerms(eligibility: WebEligibility): readonly string[] {
+  if (!eligibility.eligible) return [];
+  const anchor = eligibility.anchor;
+  return anchor.kind === "org-domain"
+    ? eligibility.safeQueryTerms.slice(1).concat(anchor.domain.value)
+    : [anchor.organization];
+}
+
+function recordNameLeakTerms(contact: ContactRecord, sets: LeakTermSets): void {
+  const name = primaryDisplayName(contact)?.toLowerCase() ?? null;
+  if (name === null || name.length < 3) return;
+  const eligibility = evaluateWebEligibility(contact);
+  if (!eligibility.eligible) {
+    sets.bareNames.add(name);
+    return;
+  }
+  const anchors = sets.anchoredNames.get(name) ?? new Set<string>();
+  for (const term of eligibleAnchorTerms(eligibility)) {
+    const lowered = term.trim().toLowerCase();
+    if (lowered.length > 0 && lowered !== name) anchors.add(lowered);
+  }
+  sets.anchoredNames.set(name, anchors);
+}
+
 function recordContactLeakTerms(
   contact: ContactRecord,
-  phones: Set<string>,
-  emails: Set<string>,
-  bareNames: Set<string>,
-  streets: Set<string>,
+  sets: LeakTermSets,
 ): void {
   for (const phone of contact.phoneNumbers) {
     const digits = phone.value.replace(/\D/g, "");
-    if (digits.length >= 7) phones.add(digits);
+    if (digits.length >= 7) sets.phones.add(digits);
   }
   for (const emailEntry of contact.emailAddresses) {
     const parsed = parseEmailAddress(emailEntry.value);
-    if (parsed !== null) emails.add(parsed.value);
+    if (parsed !== null) sets.emails.add(parsed.value);
   }
-  if (!evaluateWebEligibility(contact).eligible) {
-    const name = primaryDisplayName(contact);
-    if (name !== null && name.length >= 3) bareNames.add(name.toLowerCase());
-  }
+  recordNameLeakTerms(contact, sets);
   for (const addr of contact.addresses) {
     const street = (addr.streetAddress ?? addr.formattedValue ?? "").trim();
-    if (street.length >= 6) streets.add(street.toLowerCase());
+    if (street.length >= 6) sets.streets.add(street.toLowerCase());
   }
 }
 
 export function buildLeakGuard(
   contacts: readonly ContactRecord[],
 ): PlanLeakGuard {
-  const phones = new Set<string>();
-  const emails = new Set<string>();
-  const bareNames = new Set<string>();
-  const streets = new Set<string>();
-  for (const contact of contacts) {
-    recordContactLeakTerms(contact, phones, emails, bareNames, streets);
-  }
+  const sets: LeakTermSets = {
+    phones: new Set<string>(),
+    emails: new Set<string>(),
+    bareNames: new Set<string>(),
+    anchoredNames: new Map<string, Set<string>>(),
+    streets: new Set<string>(),
+  };
+  for (const contact of contacts) recordContactLeakTerms(contact, sets);
   return {
-    privatePhones: [...phones].sort(compareCodeUnit),
-    personalEmails: [...emails].sort(compareCodeUnit),
-    bareNames: [...bareNames].sort(compareCodeUnit),
-    streetAddresses: [...streets].sort(compareCodeUnit),
+    privatePhones: [...sets.phones].sort(compareCodeUnit),
+    personalEmails: [...sets.emails].sort(compareCodeUnit),
+    bareNames: [...sets.bareNames].sort(compareCodeUnit),
+    anchoredNames: [...sets.anchoredNames.keys()]
+      .sort(compareCodeUnit)
+      .map((name) => ({
+        name,
+        anchors: [...(sets.anchoredNames.get(name) ?? [])].sort(
+          compareCodeUnit,
+        ),
+      })),
+    streetAddresses: [...sets.streets].sort(compareCodeUnit),
   };
 }
 
@@ -233,6 +268,14 @@ export function detectWebQueryLeak(
   if (emailLeak !== null) return emailLeak;
   if (guard.bareNames.some((name) => lowered.includes(name))) {
     return "Web query leaks an ineligible bare personal name.";
+  }
+  const unanchored = guard.anchoredNames.find((entry) => {
+    if (!lowered.includes(entry.name)) return false;
+    const rest = lowered.split(entry.name).join(" ");
+    return !entry.anchors.some((anchor) => rest.includes(anchor));
+  });
+  if (unanchored !== undefined) {
+    return "Web query names a Contact's personal name without its organization or domain anchor.";
   }
   if (guard.streetAddresses.some((street) => lowered.includes(street))) {
     return "Web query leaks a residential street address.";

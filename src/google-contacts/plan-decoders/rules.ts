@@ -24,6 +24,7 @@ import {
 } from "../evidence-decoders/rules.ts";
 import { decodeRecordLists } from "../person-fields/rules.ts";
 import type {
+  AnchoredName,
   ContactWireFields,
   DeleteBatch,
   MutationPlanDoc,
@@ -319,16 +320,35 @@ function decodeLeakGuard(raw: unknown): PlanLeakGuard | null {
   const privatePhones = decodeStringList(ownValue(obj, "privatePhones"));
   const personalEmails = decodeStringList(ownValue(obj, "personalEmails"));
   const bareNames = decodeStringList(ownValue(obj, "bareNames"));
+  const anchoredNames = decodeStrictList(
+    ownArray(obj, "anchoredNames"),
+    decodeAnchoredName,
+  );
   const streetAddresses = decodeStringList(ownValue(obj, "streetAddresses"));
   if (
     privatePhones === null ||
     personalEmails === null ||
     bareNames === null ||
+    anchoredNames === null ||
     streetAddresses === null
   ) {
     return null;
   }
-  return { privatePhones, personalEmails, bareNames, streetAddresses };
+  return {
+    privatePhones,
+    personalEmails,
+    bareNames,
+    anchoredNames,
+    streetAddresses,
+  };
+}
+
+function decodeAnchoredName(raw: unknown): AnchoredName | null {
+  const obj = asObject(raw);
+  if (obj === null) return null;
+  const name = ownString(obj, "name");
+  const anchors = decodeStringList(ownValue(obj, "anchors"));
+  return name === null || anchors === null ? null : { name, anchors };
 }
 
 function decodeSkippedItem(raw: unknown): SkippedPlanItem | null {
