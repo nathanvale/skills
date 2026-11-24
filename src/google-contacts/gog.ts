@@ -14,6 +14,7 @@ import {
   ownNumber,
   ownString,
   ownValue,
+  parseResourceName,
 } from "./domain/rules.ts";
 import type { ContactRecord } from "./domain/rules.ts";
 
@@ -314,20 +315,28 @@ export function parseGogAuthList(
   return out;
 }
 
+function decodeListSummaryResource(raw: unknown): string | null {
+  const obj = asObject(raw);
+  const resource = obj === null ? null : ownString(obj, "resource");
+  return resource === null
+    ? null
+    : (parseResourceName(resource)?.value ?? null);
+}
+
 export function parseGogContactsListPage(json: unknown): {
-  readonly contacts: readonly ContactRecord[];
+  readonly resourceNames: readonly string[];
   readonly nextPageToken: string | null;
 } | null {
   const obj = asObject(json);
   if (obj === null) return null;
-  const contacts = decodeStrictList(
+  const resourceNames = decodeStrictList(
     ownArray(obj, "contacts"),
-    decodeContactRecord,
+    decodeListSummaryResource,
   );
-  if (contacts === null) return null;
+  if (resourceNames === null) return null;
   const token = ownString(obj, "nextPageToken");
   return {
-    contacts,
+    resourceNames,
     nextPageToken: token !== null && token.trim().length > 0 ? token : null,
   };
 }

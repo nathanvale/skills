@@ -23,6 +23,7 @@ export type GogStubBehavior = {
   }[];
   readonly listExit?: number;
   readonly listPages?: readonly (readonly ContactRecord[])[];
+  readonly listStdoutByPage?: Readonly<Record<string, string>>;
   readonly batchGetExit?: number;
   readonly batchGetExitByCall?: Readonly<Record<string, number>>;
   readonly batchGetStdoutByCall?: Readonly<Record<string, string>>;
@@ -194,15 +195,22 @@ if (args[0] === "auth" && args[1] === "list") {
 }
 if (args[0] === "contacts" && args[1] === "list") {
   if ((b.listExit ?? 0) !== 0) process.exit(b.listExit);
-  if (Array.isArray(b.listPages)) {
-    const pageIdxArg = args.indexOf("--page");
-    const pageIndex = pageIdxArg === -1 ? 0 : Number(args[pageIdxArg + 1] ?? "0");
-    const pageContacts = b.listPages[pageIndex] ?? [];
-    const nextToken = pageIndex + 1 < b.listPages.length ? String(pageIndex + 1) : null;
-    process.stdout.write(JSON.stringify({ contacts: pageContacts, nextPageToken: nextToken }));
+  const pageIdxArg = args.indexOf("--page");
+  const pageIndex = pageIdxArg === -1 ? 0 : Number(args[pageIdxArg + 1] ?? "0");
+  const rawPage = b.listStdoutByPage?.[String(pageIndex)];
+  if (typeof rawPage === "string") {
+    process.stdout.write(rawPage);
     process.exit(0);
   }
-  process.stdout.write(JSON.stringify({ contacts: state.contacts, nextPageToken: null }));
+  const pages = Array.isArray(b.listPages) ? b.listPages : [state.contacts];
+  const summary = (c) => ({
+    resource: c.resourceName,
+    ...(c.names?.[0]?.displayName ? { name: c.names[0].displayName } : {}),
+    ...(c.emailAddresses?.[0]?.value ? { email: c.emailAddresses[0].value } : {}),
+    ...(c.phoneNumbers?.[0]?.value ? { phone: c.phoneNumbers[0].value } : {}),
+  });
+  const nextToken = pageIndex + 1 < pages.length ? String(pageIndex + 1) : "";
+  process.stdout.write(JSON.stringify({ contacts: (pages[pageIndex] ?? []).map(summary), nextPageToken: nextToken }));
   process.exit(0);
 }
 if (args[0] === "contacts" && args[1] === "batch" && args[2] === "get") {

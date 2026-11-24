@@ -220,6 +220,8 @@ type BatchGetResult =
 
 const PERSON_NOT_FOUND_EXIT = 1;
 
+const GOG_BATCH_READ_LIMIT = 200;
+
 function batchGetStdoutJson(res: GogCallOutcome): unknown {
   if (res.kind === "ok") return res.json;
   if (res.kind !== "rejected" || res.exitCode !== PERSON_NOT_FOUND_EXIT) {
@@ -292,13 +294,13 @@ export async function batchGetContacts(params: {
 }): Promise<BatchGetResult> {
   const found = new Map<string, ContactRecord>();
   const missing: string[] = [];
-  for (let i = 0; i < params.resourceNames.length; i += 200) {
+  for (let i = 0; i < params.resourceNames.length; i += GOG_BATCH_READ_LIMIT) {
     const chunk = await batchGetChunk({
       programs: params.programs,
       executable: params.executable,
       account: params.account,
       client: params.client,
-      slice: params.resourceNames.slice(i, i + 200),
+      slice: params.resourceNames.slice(i, i + GOG_BATCH_READ_LIMIT),
       config: params.config,
       aborted: params.aborted,
     });
@@ -321,7 +323,7 @@ type ListParams = {
 type ListPageResult =
   | {
       readonly kind: "page";
-      readonly contacts: readonly ContactRecord[];
+      readonly resourceNames: readonly string[];
       readonly nextPageToken: string | null;
     }
   | { readonly kind: "transient"; readonly detail: string }
@@ -353,7 +355,7 @@ async function listContactsPage(
     params.aborted,
   );
   if (res.kind === "empty") {
-    return { kind: "page", contacts: [], nextPageToken: null };
+    return { kind: "page", resourceNames: [], nextPageToken: null };
   }
   if (res.kind === "transient" || res.kind === "unconfirmed") {
     return { kind: "transient", detail: res.detail };
@@ -364,26 +366,53 @@ async function listContactsPage(
     ? {
         kind: "unavailable",
         detail:
-          "gog contacts list returned a page that is not a contacts[] list of Person objects with resourceName and etag.",
+          "gog contacts list returned a page that is not a contacts[] list of summaries with a people/ resource.",
       }
     : { kind: "page", ...parsed };
 }
 
-export async function listAllContacts(
+async function listAllResourceNames(
   params: ListParams,
 ): Promise<
-  | { readonly kind: "ok"; readonly contacts: readonly ContactRecord[] }
+  | { readonly kind: "ok"; readonly resourceNames: readonly string[] }
   | { readonly kind: "transient"; readonly detail: string }
   | { readonly kind: "unavailable"; readonly detail: string }
 > {
-  const contacts: ContactRecord[] = [];
+  const names = new Set<string>();
   let pageToken: string | null = null;
   for (let page = 0; page < 200; page += 1) {
     const res = await listContactsPage(params, pageToken);
     if (res.kind !== "page") return res;
-    for (const item of res.contacts) contacts.push(item);
+    for (const name of res.resourceNames) names.add(name);
     pageToken = res.nextPageToken;
     if (pageToken === null) break;
   }
-  return { kind: "ok", contacts };
+  return { kind: "ok", resourceNames: [...names] };
+}
+
+export async function listAllContacts(params: ListParams): Promise<
+  | {
+      readonly kind: "ok";
+      readonly contacts: readonly ContactRecord[];
+      readonly missing: readonly string[];
+    }
+  | { readonly kind: "transient"; readonly detail: string }
+  | { readonly kind: "unavailable"; readonly detail: string }
+> {
+  const listed = await listAllResourceNames(params);
+  if (listed.kind !== "ok") return listed;
+  const fetched = await batchGetContacts({
+    ...params,
+    resourceNames: listed.resourceNames,
+  });
+  if (fetched.kind === "transient" || fetched.kind === "unconfirmed") {
+    return { kind: "transient", detail: fetched.detail };
+  }
+  if (fetched.kind !== "ok") return fetched;
+  const contacts: ContactRecord[] = [];
+  for (const name of listed.resourceNames) {
+    const record = fetched.found.get(name);
+    if (record !== undefined) contacts.push(record);
+  }
+  return { kind: "ok", contacts, missing: fetched.missing };
 }

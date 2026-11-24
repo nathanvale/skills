@@ -277,7 +277,7 @@ export function createSnapshotCommand(deps: InspectCommandsDeps) {
         account,
         capturedAt: deps.nowIso(),
         contacts: listed.contacts,
-        missingContacts: [],
+        missingContacts: listed.missing,
       };
       return context.result(
         {
