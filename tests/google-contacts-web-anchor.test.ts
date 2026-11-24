@@ -6,7 +6,7 @@ import type {
   EvidenceItem,
 } from "../src/google-contacts/domain/rules.ts";
 import { computePlanSeal } from "../src/google-contacts/plan-types/rules.ts";
-import type { MutationPlanDoc } from "../src/google-contacts/plan-types/rules.ts";
+import { isPlanDoc } from "./support/google-contacts-forged.ts";
 import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
 import { runContactsCli } from "./support/google-contacts-run.ts";
 import {
@@ -193,14 +193,6 @@ async function planWithItem(dir: string, item: EvidenceItem) {
     "--min-confidence",
     "low",
   ]);
-}
-
-function isPlanDoc(value: unknown): value is MutationPlanDoc {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    Reflect.get(value, "schemaVersion") === "contacts-plan/1"
-  );
 }
 
 test("plan and apply refuse a web query naming any personal-name variant of a Contact without its organization or domain anchor", async () => {

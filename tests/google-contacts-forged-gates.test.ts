@@ -1,24 +1,16 @@
 import { expect, setDefaultTimeout, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { ContactRecord } from "../src/google-contacts/domain/rules.ts";
-import { computePlanSeal } from "../src/google-contacts/plan-types/rules.ts";
-import type {
-  MutationPlanBody,
-  MutationPlanDoc,
-  PlannedContactUpdate,
-  UpdateSubBatch,
-} from "../src/google-contacts/plan-types/rules.ts";
+import type { MutationPlanBody } from "../src/google-contacts/plan-types/rules.ts";
+import type { ForgedRow } from "./support/google-contacts-forged.ts";
 import {
-  createGogStub,
-  sampleContact,
-} from "./support/google-contacts-stubs.ts";
-import {
-  planFromContacts,
-  runContactsCli,
-} from "./support/google-contacts-run.ts";
-import { testFolder } from "./support/test-folder.ts";
+  applyForgedRow,
+  withFirstUpdate,
+} from "./support/google-contacts-forged.ts";
 import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
+import { sampleContact } from "./support/google-contacts-stubs.ts";
+import { testFolder } from "./support/test-folder.ts";
 
 setDefaultTimeout(60_000);
 
@@ -95,27 +87,6 @@ const PHONE_PROPOSAL = {
 
 type Body = MutationPlanBody;
 
-function bodyOf(plan: MutationPlanDoc): Body {
-  const { seal, ...body } = plan;
-  expect(seal.startsWith("sha256:")).toBe(true);
-  return body;
-}
-
-function withFirstUpdate(
-  body: Body,
-  change: (update: PlannedContactUpdate) => PlannedContactUpdate,
-): Body {
-  const [batch, ...rest] = body.updateSubBatches;
-  if (batch === undefined) throw new Error("Plan has no sub-batch.");
-  const [update, ...others] = batch.updates;
-  if (update === undefined) throw new Error("Plan has no update.");
-  const changed: UpdateSubBatch = {
-    ...batch,
-    updates: [change(update), ...others],
-  };
-  return { ...body, updateSubBatches: [changed, ...rest] };
-}
-
 function addUnrelatedDelete(body: Body, clusterSurvivor: string | null): Body {
   const [batch] = body.deleteBatches;
   if (batch === undefined) throw new Error("Plan has no delete batch.");
@@ -147,15 +118,6 @@ function addUnrelatedDelete(body: Body, clusterSurvivor: string | null): Body {
     ],
   };
 }
-
-type ForgedRow = {
-  readonly name: string;
-  readonly lane: string;
-  readonly planned: readonly ContactRecord[];
-  readonly live: readonly ContactRecord[];
-  readonly proposal: unknown;
-  readonly forge: (body: Body) => Body;
-};
 
 const MERGE_SET = [survivor, duplicate, unrelated];
 
@@ -479,14 +441,6 @@ const ROWS: readonly ForgedRow[] = [
 
 const EXPECTED_ROW_COUNT = 18;
 
-function isPlanDoc(value: unknown): value is MutationPlanDoc {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    Reflect.get(value, "schemaVersion") === "contacts-plan/1"
-  );
-}
-
 test("apply refuses every forged plan field that gates a delete or an overwrite, with zero writes", async () => {
   expect(ROWS.length).toBe(EXPECTED_ROW_COUNT);
   const root = testFolder("gc-forged-gates-");
@@ -495,42 +449,7 @@ test("apply refuses every forged plan field that gates a delete or an overwrite,
     for (const [index, row] of ROWS.entries()) {
       const dir = join(root, String(index));
       mkdirSync(dir, { recursive: true });
-      const honest = await planFromContacts({
-        dir,
-        contacts: row.planned,
-        lane: row.lane,
-        proposals: [row.proposal],
-      });
-      expect(`${row.name}: ${honest.run.causeCode}`).toBe(
-        `${row.name}: SUCCESS_UNCHANGED`,
-      );
-      if (!isPlanDoc(honest.run.data)) throw new Error("No plan document.");
-      const forged = row.forge(bodyOf(honest.run.data));
-      const seal = computePlanSeal(forged).value;
-      const forgedFile = join(dir, "forged.json");
-      writeFileSync(forgedFile, JSON.stringify({ ...forged, seal }), "utf8");
-      const gog = createGogStub(dir, {
-        account: "owner@example.com",
-        contacts: row.live,
-      });
-      const applied = await runContactsCli(
-        {
-          env: { GOOGLE_CONTACTS_LEDGER_DIR: join(dir, "ledger") },
-          gogBin: gog.binPath,
-        },
-        ["apply", "--plan", forgedFile, "--seal", seal],
-      );
-      const writes = gog
-        .readLog()
-        .filter(
-          (entry) =>
-            entry.args.includes("update") || entry.args.includes("delete"),
-        ).length;
-      const unchanged =
-        JSON.stringify(gog.readState().contacts) === JSON.stringify(row.live);
-      observed.push(
-        `${row.name}: ${applied.causeCode} writes=${String(writes)} addressBookUnchanged=${String(unchanged)}`,
-      );
+      observed.push(await applyForgedRow(dir, row));
     }
     expect(observed).toEqual(
       ROWS.map(

@@ -2,7 +2,7 @@ import { expect, setDefaultTimeout, test } from "bun:test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { ContactName } from "../src/google-contacts/domain/rules.ts";
-import type { MutationPlanDoc } from "../src/google-contacts/plan-types/rules.ts";
+import { isPlanDoc } from "./support/google-contacts-forged.ts";
 import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
 import { planFromContacts } from "./support/google-contacts-run.ts";
 import { sampleContact } from "./support/google-contacts-stubs.ts";
@@ -146,14 +146,6 @@ const ROWS: readonly NameRow[] = [
     },
   },
 ];
-
-function isPlanDoc(value: unknown): value is MutationPlanDoc {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    Reflect.get(value, "schemaVersion") === "contacts-plan/1"
-  );
-}
 
 async function mergeOutcome(
   dir: string,
