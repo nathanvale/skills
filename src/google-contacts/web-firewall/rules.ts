@@ -176,20 +176,45 @@ function eligibleAnchorTerms(eligibility: WebEligibility): readonly string[] {
     : [anchor.organization];
 }
 
+function normalizeTerms(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function personalNameVariants(contact: ContactRecord): ReadonlySet<string> {
+  const organizations = new Set(
+    contact.organizations.map((org) => normalizeTerms(org.name ?? "")),
+  );
+  const variants = new Set<string>();
+  for (const name of contact.names) {
+    const structured = `${name.givenName ?? ""} ${name.familyName ?? ""}`;
+    for (const raw of [
+      name.displayName ?? "",
+      structured,
+      name.unstructuredName ?? "",
+    ]) {
+      const variant = normalizeTerms(raw);
+      if (variant.length >= 3 && !organizations.has(variant)) {
+        variants.add(variant);
+      }
+    }
+  }
+  return variants;
+}
+
 function recordNameLeakTerms(contact: ContactRecord, sets: LeakTermSets): void {
-  const name = primaryDisplayName(contact)?.toLowerCase() ?? null;
-  if (name === null || name.length < 3) return;
   const eligibility = evaluateWebEligibility(contact);
-  if (!eligibility.eligible) {
-    sets.bareNames.add(name);
-    return;
+  for (const name of personalNameVariants(contact)) {
+    if (!eligibility.eligible) {
+      sets.bareNames.add(name);
+      continue;
+    }
+    const anchors = sets.anchoredNames.get(name) ?? new Set<string>();
+    for (const term of eligibleAnchorTerms(eligibility)) {
+      const anchor = normalizeTerms(term);
+      if (anchor.length > 0 && anchor !== name) anchors.add(anchor);
+    }
+    sets.anchoredNames.set(name, anchors);
   }
-  const anchors = sets.anchoredNames.get(name) ?? new Set<string>();
-  for (const term of eligibleAnchorTerms(eligibility)) {
-    const lowered = term.trim().toLowerCase();
-    if (lowered.length > 0 && lowered !== name) anchors.add(lowered);
-  }
-  sets.anchoredNames.set(name, anchors);
 }
 
 function recordContactLeakTerms(
@@ -206,8 +231,10 @@ function recordContactLeakTerms(
   }
   recordNameLeakTerms(contact, sets);
   for (const addr of contact.addresses) {
-    const street = (addr.streetAddress ?? addr.formattedValue ?? "").trim();
-    if (street.length >= 6) sets.streets.add(street.toLowerCase());
+    const street = normalizeTerms(
+      addr.streetAddress ?? addr.formattedValue ?? "",
+    );
+    if (street.length >= 6) sets.streets.add(street);
   }
 }
 
@@ -252,11 +279,22 @@ function checkEmailLeaks(lowered: string, guard: PlanLeakGuard): string | null {
   return null;
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function containsWholeTerm(text: string, term: string): boolean {
+  return new RegExp(
+    `(?<![\\p{L}\\p{N}_@.-])${escapeRegExp(term)}(?![\\p{L}\\p{N}_@-]|\\.[\\p{L}\\p{N}])`,
+    "u",
+  ).test(text);
+}
+
 export function detectWebQueryLeak(
   query: string,
   guard: PlanLeakGuard,
 ): string | null {
-  const lowered = query.toLowerCase();
+  const lowered = normalizeTerms(query);
   const digits = query.replace(/\D/g, "");
   if (PHONE_LIKE_IN_QUERY.test(query)) {
     return "Web query contains a phone number pattern.";
@@ -272,7 +310,7 @@ export function detectWebQueryLeak(
   const unanchored = guard.anchoredNames.find((entry) => {
     if (!lowered.includes(entry.name)) return false;
     const rest = lowered.split(entry.name).join(" ");
-    return !entry.anchors.some((anchor) => rest.includes(anchor));
+    return !entry.anchors.some((anchor) => containsWholeTerm(rest, anchor));
   });
   if (unanchored !== undefined) {
     return "Web query names a Contact's personal name without its organization or domain anchor.";

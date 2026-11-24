@@ -1,12 +1,22 @@
-import { expect, test } from "bun:test";
-import type { EvidenceItem } from "../src/google-contacts/domain/rules.ts";
-import { compileMutationPlan } from "../src/google-contacts/plan/rules.ts";
+import { expect, setDefaultTimeout, test } from "bun:test";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import type {
+  ContactRecord,
+  EvidenceItem,
+} from "../src/google-contacts/domain/rules.ts";
 import { computePlanSeal } from "../src/google-contacts/plan-types/rules.ts";
-import { validateMutationPlan } from "../src/google-contacts/plan-validate/rules.ts";
+import type { MutationPlanDoc } from "../src/google-contacts/plan-types/rules.ts";
+import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
+import { runContactsCli } from "./support/google-contacts-run.ts";
 import {
+  createGogStub,
   sampleContact,
   sampleSnapshot,
 } from "./support/google-contacts-stubs.ts";
+import { testFolder } from "./support/test-folder.ts";
+
+setDefaultTimeout(120_000);
 
 const eligible = sampleContact("alex", {
   names: [{ displayName: "Alex Example" }],
@@ -22,53 +32,45 @@ const eligibleByName = sampleContact("riley", {
   emailAddresses: [],
   organizations: [{ name: "Contoso Labs" }],
 });
-const snapshot = sampleSnapshot([eligible, eligibleByName]);
-
-function webItem(query: string, target: string): EvidenceItem {
-  return {
-    id: "web-anchor",
-    lane: "web",
-    contactResourceName: target,
-    anchor: null,
-    sourceRef: "https://example.org/profile",
-    observedAt: null,
-    excerpt: "Profile",
-    query,
-    suggestedFields: {},
-  };
-}
-
-function compile(item: EvidenceItem) {
-  return compileMutationPlan({
-    snapshot,
-    lane: "note-append",
-    accountOverride: null,
-    audit: null,
-    proposals: {
-      schemaVersion: "contacts-proposals/1",
-      account: snapshot.account,
-      proposals: [
-        {
-          kind: "note-append",
-          target: item.contactResourceName,
-          noteLine: "Seen on the web",
-          evidenceIds: [item.id],
-        },
-      ],
+const honorific = sampleContact("jordan", {
+  names: [
+    {
+      displayName: "Dr Jordan Sample",
+      givenName: "Jordan",
+      familyName: "Sample",
     },
-    evidenceItems: [item],
-    contactFilter: [],
-    minConfidence: "low",
-    maxContacts: 50,
-    defaultRegion: "AU",
-  });
-}
+  ],
+  phoneNumbers: [{ value: "+61491570503", type: "mobile" }],
+  emailAddresses: [{ value: "jordan@sample.example.org", type: "work" }],
+  organizations: [{ name: "Sample Holdings", domain: "sample.example.org" }],
+});
+const freeFormOnly = sampleContact("casey", {
+  names: [{ unstructuredName: "Casey   Example" }],
+  phoneNumbers: [{ value: "+61491570504", type: "mobile" }],
+  emailAddresses: [],
+  organizations: [],
+});
+const organisationNamed = sampleContact("fabrikam", {
+  names: [{ displayName: "Fabrikam Studio" }],
+  phoneNumbers: [{ value: "+61491570505", type: "mobile" }],
+  emailAddresses: [],
+  organizations: [{ name: "Fabrikam Studio" }],
+});
+const CONTACTS: readonly ContactRecord[] = [
+  eligible,
+  eligibleByName,
+  honorific,
+  freeFormOnly,
+  organisationNamed,
+];
 
-const ROWS: readonly {
+type AnchorRow = {
   readonly query: string;
   readonly target: string;
   readonly expected: "refused" | "accepted";
-}[] = [
+};
+
+const ROWS: readonly AnchorRow[] = [
   {
     query: "Alex Example biography",
     target: "people/alex",
@@ -96,31 +98,159 @@ const ROWS: readonly {
     target: "people/alex",
     expected: "accepted",
   },
+  {
+    query: "Jordan Sample biography",
+    target: "people/jordan",
+    expected: "refused",
+  },
+  {
+    query: '"Dr Jordan Sample" "Sample Holdings"',
+    target: "people/jordan",
+    expected: "accepted",
+  },
+  {
+    query: "Casey Example biography",
+    target: "people/casey",
+    expected: "refused",
+  },
+  {
+    query: "Alex  Example biography",
+    target: "people/alex",
+    expected: "refused",
+  },
+  {
+    query: "Riley\tSample biography",
+    target: "people/riley",
+    expected: "refused",
+  },
+  {
+    query: "Alex Example example.completely biography",
+    target: "people/alex",
+    expected: "refused",
+  },
+  {
+    query: '"Fabrikam Studio" "Fabrikam Studio"',
+    target: "people/fabrikam",
+    expected: "accepted",
+  },
 ];
 
-test("plan and apply refuse a web query naming a web-eligible Contact's personal name without its organization or domain anchor", () => {
-  expect(ROWS.length).toBe(7);
-  const anchoredPlan = compile(
-    webItem('"Alex Example" "Example Corporation"', "people/alex"),
-  );
-  if (!anchoredPlan.ok) throw new Error(anchoredPlan.reason);
-  const { seal, ...body } = anchoredPlan.plan;
-  expect(seal.startsWith("sha256:")).toBe(true);
-  const observed = ROWS.map((row) => {
-    const item = webItem(row.query, row.target);
-    const planned = compile(item);
-    const forged = { ...body, evidenceSummary: [item] };
-    const applyErr = validateMutationPlan({
-      ...forged,
-      seal: computePlanSeal(forged).value,
-    });
-    const planVerdict = planned.ok ? "accepted" : "refused";
-    const applyVerdict = applyErr === null ? "accepted" : "refused";
-    return `${row.query}: plan ${planVerdict}, apply ${applyVerdict}`;
+function webItem(query: string, target: string): EvidenceItem {
+  return {
+    id: "web-anchor",
+    lane: "web",
+    contactResourceName: target,
+    anchor: null,
+    sourceRef: "https://example.org/profile",
+    observedAt: null,
+    excerpt: "Profile",
+    query,
+    suggestedFields: {},
+  };
+}
+
+function writeJson(path: string, value: unknown): string {
+  writeFileSync(path, JSON.stringify(value), "utf8");
+  return path;
+}
+
+async function planWithItem(dir: string, item: EvidenceItem) {
+  const snapFile = writeJson(join(dir, "snap.json"), sampleSnapshot(CONTACTS));
+  const propFile = writeJson(join(dir, "props.json"), {
+    schemaVersion: "contacts-proposals/1",
+    account: "owner@example.com",
+    proposals: [
+      {
+        kind: "note-append",
+        target: item.contactResourceName,
+        noteLine: "Seen on the web",
+        evidenceIds: [item.id],
+      },
+    ],
   });
-  expect(observed).toEqual(
-    ROWS.map(
-      (row) => `${row.query}: plan ${row.expected}, apply ${row.expected}`,
-    ),
+  const evidenceFile = writeJson(join(dir, "evidence.json"), {
+    schemaVersion: "contacts-evidence/1",
+    account: "owner@example.com",
+    lanesRequested: ["web-queue"],
+    lanesStatus: {
+      gmail: { status: "skipped", detail: "Not requested." },
+      imsg: { status: "skipped", detail: "Not requested." },
+      webQueue: { status: "ready", detail: "Host web search." },
+    },
+    items: [item],
+    webResearchQueue: [],
+  });
+  return runContactsCli({ env: {} }, [
+    "plan",
+    "--snapshot",
+    snapFile,
+    "--lane",
+    "note-append",
+    "--proposals",
+    propFile,
+    "--evidence",
+    evidenceFile,
+    "--min-confidence",
+    "low",
+  ]);
+}
+
+function isPlanDoc(value: unknown): value is MutationPlanDoc {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Reflect.get(value, "schemaVersion") === "contacts-plan/1"
   );
+}
+
+test("plan and apply refuse a web query naming any personal-name variant of a Contact without its organization or domain anchor", async () => {
+  expect(ROWS.length).toBe(14);
+  const root = testFolder("gc-web-anchor-");
+  try {
+    const honestDir = join(root, "honest");
+    mkdirSync(honestDir, { recursive: true });
+    const honest = await planWithItem(
+      honestDir,
+      webItem('"Alex Example" "Example Corporation"', "people/alex"),
+    );
+    if (!isPlanDoc(honest.data)) throw new Error(honest.message);
+    const { seal: honestSeal, ...body } = honest.data;
+    expect(honestSeal.startsWith("sha256:")).toBe(true);
+    const observed: string[] = [];
+    for (const [index, row] of ROWS.entries()) {
+      const dir = join(root, String(index));
+      mkdirSync(dir, { recursive: true });
+      const item = webItem(row.query, row.target);
+      const planned = await planWithItem(dir, item);
+      const forged = { ...body, evidenceSummary: [item] };
+      const seal = computePlanSeal(forged).value;
+      const forgedFile = writeJson(join(dir, "forged.json"), {
+        ...forged,
+        seal,
+      });
+      const gog = createGogStub(dir, {
+        account: "owner@example.com",
+        contacts: CONTACTS,
+      });
+      const applied = await runContactsCli(
+        {
+          env: { GOOGLE_CONTACTS_LEDGER_DIR: join(dir, "ledger") },
+          gogBin: gog.binPath,
+        },
+        ["apply", "--plan", forgedFile, "--seal", seal],
+      );
+      observed.push(
+        `${JSON.stringify(row.query)}: plan ${planned.causeCode}, apply ${applied.causeCode}`,
+      );
+    }
+    expect(observed).toEqual(
+      ROWS.map((row) =>
+        row.expected === "accepted"
+          ? `${JSON.stringify(row.query)}: plan SUCCESS_UNCHANGED, apply SUCCESS_COMPLETED`
+          : `${JSON.stringify(row.query)}: plan DOMAIN_CONTACTS_PLAN_INVALID, apply DOMAIN_CONTACTS_PLAN_INVALID`,
+      ),
+    );
+  } finally {
+    removeOwnedFolder(root);
+  }
 });
