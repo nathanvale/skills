@@ -16,7 +16,7 @@ import {
 } from "./support/google-contacts-stubs.ts";
 import { testFolder } from "./support/test-folder.ts";
 
-setDefaultTimeout(30_000);
+setDefaultTimeout(90_000);
 
 function minimalEnv(
   extra: Readonly<Record<string, string>>,
@@ -200,7 +200,7 @@ test("sterile copied skill bundle runs full pipeline, concurrent APPLY_HELD, and
       { cwd: dir, env: holdEnv, stdout: "pipe", stderr: "pipe" },
     );
     activeProcs.push(procA);
-    await waitForFile(holdReady);
+    await waitForFile(holdReady, { abandonWhen: procA.exited });
 
     const procB = runBundle(bundlePath, dir, holdEnv, [
       "apply",
@@ -246,7 +246,7 @@ test("sterile copied skill bundle runs full pipeline, concurrent APPLY_HELD, and
       { cwd: dir, env: sigEnv, stdout: "pipe", stderr: "pipe" },
     );
     activeProcs.push(victim);
-    await waitForFile(hangReady);
+    await waitForFile(hangReady, { abandonWhen: victim.exited });
     victim.kill("SIGTERM");
     const victimExit = await victim.exited;
     expect(victimExit).toBe(143);

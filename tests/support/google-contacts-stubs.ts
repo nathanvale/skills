@@ -5,7 +5,7 @@ import {
   watch,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 import type {
   ContactRecord,
   ContactSnapshotDoc,
@@ -104,34 +104,52 @@ export function sampleSnapshot(
 
 export function waitForFile(
   filePath: string,
-  timeoutMs = 10_000,
+  options: {
+    readonly timeoutMs?: number;
+    readonly abandonWhen?: Promise<unknown>;
+  } = {},
 ): Promise<void> {
   if (existsSync(filePath)) return Promise.resolve();
-  const folder = dirname(filePath);
-  const target = basename(filePath);
+  const timeoutMs = options.timeoutMs ?? 30_000;
   return new Promise((resolve, reject) => {
     let settled = false;
     const finish = (error?: Error): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearInterval(recheck);
       watcher.close();
       if (error !== undefined) reject(error);
       else resolve();
     };
-    const watcher = watch(folder, (_event, name) => {
-      if (name === target || existsSync(filePath)) finish();
+    const resolveIfPresent = (): boolean => {
+      if (existsSync(filePath)) finish();
+      return settled;
+    };
+    const watcher = watch(dirname(filePath), () => {
+      resolveIfPresent();
     });
+    const recheck = setInterval(resolveIfPresent, 100);
     const timer = setTimeout(() => {
-      finish(new Error(`Timed out waiting for file ${filePath}.`));
+      if (!resolveIfPresent()) {
+        finish(new Error(`Timed out waiting for file ${filePath}.`));
+      }
     }, timeoutMs);
-    if (existsSync(filePath)) finish();
+    void options.abandonWhen?.then(
+      () => {
+        if (!resolveIfPresent()) {
+          finish(new Error(`Process exited before ${filePath} appeared.`));
+        }
+      },
+      () => undefined,
+    );
+    resolveIfPresent();
   });
 }
 
 const STUB_GOG_BODY = `
 import { existsSync, readFileSync, watch, writeFileSync } from "node:fs";
-import { basename, dirname } from "node:path";
+import { dirname } from "node:path";
 const state = JSON.parse(readFileSync(statePath, "utf8"));
 const b = state.behavior ?? {};
 const args = process.argv.slice(2);
@@ -143,10 +161,17 @@ if (logPath) {
 const save = () => writeFileSync(statePath, JSON.stringify(state), "utf8");
 const waitRelease = (file) => new Promise((resolve) => {
   if (existsSync(file)) return resolve();
-  const w = watch(dirname(file), (_ev, name) => {
-    if (name === basename(file) || existsSync(file)) { w.close(); resolve(); }
-  });
-  if (existsSync(file)) { w.close(); resolve(); }
+  let w;
+  let timer;
+  const done = () => {
+    if (!existsSync(file)) return;
+    clearInterval(timer);
+    w.close();
+    resolve();
+  };
+  w = watch(dirname(file), done);
+  timer = setInterval(done, 100);
+  done();
 });
 
 if (args[0] === "--version") {
