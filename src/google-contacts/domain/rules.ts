@@ -59,7 +59,7 @@ export type FieldMetadata = {
   readonly primary?: boolean;
   readonly sourcePrimary?: boolean;
   readonly verified?: boolean;
-  readonly source?: FieldMetadataSource;
+  readonly source?: Partial<FieldMetadataSource>;
 };
 
 export type ContactName = {

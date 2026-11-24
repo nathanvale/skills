@@ -6,7 +6,7 @@ import type {
   EvidenceItem,
 } from "../src/google-contacts/domain/rules.ts";
 import { computePlanSeal } from "../src/google-contacts/plan-types/rules.ts";
-import { isPlanDoc } from "./support/google-contacts-forged.ts";
+import { requirePlanDoc } from "./support/google-contacts-forged.ts";
 import { removeOwnedFolder } from "./support/google-contacts-processes.ts";
 import { runContactsCli } from "./support/google-contacts-run.ts";
 import {
@@ -178,8 +178,8 @@ async function applyWithWebEvidence(
   item: EvidenceItem,
 ): Promise<string> {
   const honest = await planNote(dir, item.contactResourceName, null);
-  if (!isPlanDoc(honest.data)) throw new Error(honest.message);
-  const { seal: honestSeal, ...body } = honest.data;
+  const plan = requirePlanDoc(honest.data, honest.message);
+  const { seal: honestSeal, ...body } = plan;
   expect(honestSeal.startsWith("sha256:")).toBe(true);
   const forged = { ...body, evidenceSummary: [item] };
   const seal = computePlanSeal(forged).value;

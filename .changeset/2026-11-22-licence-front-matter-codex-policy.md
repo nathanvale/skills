@@ -1,0 +1,5 @@
+---
+"skills": patch
+---
+
+Added the MIT licence, removed the blank line Biome put after each skill's opening front matter fence, and kept user-only skills out of Codex's automatic skill list; validate now refuses both mistakes.

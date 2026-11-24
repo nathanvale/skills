@@ -40,10 +40,6 @@ interface HooksFile {
   hooks: Record<string, HookMatcherGroup[]>;
 }
 
-interface PluginManifest {
-  hooks: string;
-}
-
 interface RosteredHome {
   home: string;
   stateFolder: string;
@@ -243,17 +239,69 @@ function expectRegroundText(result: HookResult, expected: string): void {
   });
 }
 
-function readJson(path: string): unknown {
-  return JSON.parse(readFileSync(path, "utf8"));
+function readJsonObject(path: string): object {
+  const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`Expected JSON object in ${path}`);
+  }
+  return parsed;
+}
+
+function decodeCommandHook(raw: unknown): CommandHook {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    throw new Error("Expected command hook object");
+  }
+  const type: unknown = Reflect.get(raw, "type");
+  const command: unknown = Reflect.get(raw, "command");
+  const timeout: unknown = Reflect.get(raw, "timeout");
+  if (
+    typeof type !== "string" ||
+    typeof command !== "string" ||
+    typeof timeout !== "number"
+  ) {
+    throw new Error("Malformed command hook");
+  }
+  return { type, command, timeout };
+}
+
+function decodeMatcherGroup(raw: unknown): HookMatcherGroup {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    throw new Error("Expected hook matcher group object");
+  }
+  const matcher: unknown = Reflect.get(raw, "matcher");
+  const hooks: unknown = Reflect.get(raw, "hooks");
+  if (typeof matcher !== "string" || !Array.isArray(hooks)) {
+    throw new Error("Malformed hook matcher group");
+  }
+  return { matcher, hooks: hooks.map(decodeCommandHook) };
 }
 
 function declaredHooks(): HooksFile {
-  const manifest = readJson(
+  const manifest = readJsonObject(
     join(repositoryRoot, ".claude-plugin", "plugin.json"),
   );
   expect(manifest).toMatchObject({ hooks: "./hooks/claude/hooks.json" });
-  const { hooks } = manifest as PluginManifest;
-  return readJson(join(repositoryRoot, hooks)) as HooksFile;
+  const hooksPath: unknown = Reflect.get(manifest, "hooks");
+  if (typeof hooksPath !== "string") {
+    throw new Error("Expected string hooks path in plugin manifest");
+  }
+  const parsed = readJsonObject(join(repositoryRoot, hooksPath));
+  const rawHooks: unknown = Reflect.get(parsed, "hooks");
+  if (
+    typeof rawHooks !== "object" ||
+    rawHooks === null ||
+    Array.isArray(rawHooks)
+  ) {
+    throw new Error("Expected hooks map in hooks.json");
+  }
+  const hooks: Record<string, HookMatcherGroup[]> = {};
+  for (const [event, groups] of Object.entries(rawHooks)) {
+    if (!Array.isArray(groups)) {
+      throw new Error(`Expected matcher group array for ${event}`);
+    }
+    hooks[event] = groups.map(decodeMatcherGroup);
+  }
+  return { hooks };
 }
 
 function declaredCommand(): string {

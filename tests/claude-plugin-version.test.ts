@@ -6,37 +6,45 @@ import { repositoryRoot } from "../src/skills-catalog/skills-catalog.ts";
 const installsFollowCommitsReason =
   "Claude Code uses the commit as the plugin version when no version is set; a version field stops merged changes reaching installs until someone bumps it.";
 
-function readJsonObject(
-  relativePath: string,
-): Readonly<Record<string, unknown>> {
+function readJsonObject(relativePath: string): object {
   const parsed: unknown = JSON.parse(
     readFileSync(join(repositoryRoot(), relativePath), "utf8"),
   );
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw new Error(`${relativePath} is not a JSON object`);
   }
-  return parsed as Readonly<Record<string, unknown>>;
+  return parsed;
+}
+
+function propertyOf(target: object, key: string): unknown {
+  return Object.hasOwn(target, key) ? Reflect.get(target, key) : undefined;
 }
 
 function marketplaceEntryNamed(
-  marketplace: Readonly<Record<string, unknown>>,
+  marketplace: object,
   name: unknown,
-): Readonly<Record<string, unknown>> | undefined {
-  const entries: readonly unknown[] = Array.isArray(marketplace.plugins)
-    ? marketplace.plugins
-    : [];
-  return entries.find(
-    (entry): entry is Readonly<Record<string, unknown>> =>
+): object | undefined {
+  const rawPlugins = propertyOf(marketplace, "plugins");
+  if (!Array.isArray(rawPlugins)) return undefined;
+  const entries: readonly unknown[] = rawPlugins;
+  for (const entry of entries) {
+    if (
       typeof entry === "object" &&
       entry !== null &&
-      (entry as Readonly<Record<string, unknown>>).name === name,
-  );
+      !Array.isArray(entry) &&
+      propertyOf(entry, "name") === name
+    ) {
+      return entry;
+    }
+  }
+  return undefined;
 }
 
 test("Claude plugin manifest and its marketplace entry carry no version, so every merged commit reaches installs", () => {
   const plugin = readJsonObject(".claude-plugin/plugin.json");
   const marketplace = readJsonObject(".claude-plugin/marketplace.json");
-  const entry = marketplaceEntryNamed(marketplace, plugin.name);
+  const pluginName = propertyOf(plugin, "name");
+  const entry = marketplaceEntryNamed(marketplace, pluginName);
 
   const versionFields: string[] = [];
   if (Object.hasOwn(plugin, "version")) {
@@ -46,12 +54,12 @@ test("Claude plugin manifest and its marketplace entry carry no version, so ever
   }
   if (entry !== undefined && Object.hasOwn(entry, "version")) {
     versionFields.push(
-      `.claude-plugin/marketplace.json entry "${String(plugin.name)}" has "version". ${installsFollowCommitsReason}`,
+      `.claude-plugin/marketplace.json entry "${String(pluginName)}" has "version". ${installsFollowCommitsReason}`,
     );
   }
 
   expect({
-    pluginName: plugin.name,
+    pluginName,
     marketplaceEntryFound: entry !== undefined,
     versionFields,
   }).toEqual({

@@ -9,6 +9,7 @@ import type {
   ContactAddress,
   ContactBiography,
   ContactBirthday,
+  ContactDate,
   ContactEmail,
   ContactEvent,
   ContactName,
@@ -17,130 +18,9 @@ import type {
   ContactRecord,
   ContactRelation,
   ContactUrl,
+  FieldMetadata,
+  FieldMetadataSource,
 } from "../domain/rules.ts";
-
-type SubfieldKind = "string" | "boolean" | "number" | "date";
-
-type EntryKey<T> = Exclude<keyof T, "metadata"> & string;
-
-type EntrySchema<T> = {
-  readonly required: readonly EntryKey<T>[];
-  readonly outputOnly: readonly EntryKey<T>[];
-  readonly subfields: { readonly [K in EntryKey<T>]-?: SubfieldKind };
-};
-
-const NAME_SCHEMA: EntrySchema<ContactName> = {
-  required: [],
-  outputOnly: ["displayName", "displayNameLastFirst"],
-  subfields: {
-    displayName: "string",
-    displayNameLastFirst: "string",
-    unstructuredName: "string",
-    givenName: "string",
-    middleName: "string",
-    familyName: "string",
-    honorificPrefix: "string",
-    honorificSuffix: "string",
-    phoneticFullName: "string",
-    phoneticGivenName: "string",
-    phoneticMiddleName: "string",
-    phoneticFamilyName: "string",
-    phoneticHonorificPrefix: "string",
-    phoneticHonorificSuffix: "string",
-  },
-};
-
-const PHONE_SCHEMA: EntrySchema<ContactPhone> = {
-  required: ["value"],
-  outputOnly: ["canonicalForm", "formattedType"],
-  subfields: {
-    value: "string",
-    canonicalForm: "string",
-    type: "string",
-    formattedType: "string",
-  },
-};
-
-const EMAIL_SCHEMA: EntrySchema<ContactEmail> = {
-  required: ["value"],
-  outputOnly: ["formattedType"],
-  subfields: {
-    value: "string",
-    displayName: "string",
-    type: "string",
-    formattedType: "string",
-  },
-};
-
-const ADDRESS_SCHEMA: EntrySchema<ContactAddress> = {
-  required: [],
-  outputOnly: ["formattedType"],
-  subfields: {
-    formattedValue: "string",
-    poBox: "string",
-    streetAddress: "string",
-    extendedAddress: "string",
-    city: "string",
-    region: "string",
-    postalCode: "string",
-    country: "string",
-    countryCode: "string",
-    type: "string",
-    formattedType: "string",
-  },
-};
-
-const ORGANIZATION_SCHEMA: EntrySchema<ContactOrganization> = {
-  required: [],
-  outputOnly: ["formattedType"],
-  subfields: {
-    name: "string",
-    phoneticName: "string",
-    title: "string",
-    jobDescription: "string",
-    department: "string",
-    symbol: "string",
-    domain: "string",
-    location: "string",
-    costCenter: "string",
-    fullTimeEquivalentMillipercent: "number",
-    current: "boolean",
-    startDate: "date",
-    endDate: "date",
-    type: "string",
-    formattedType: "string",
-  },
-};
-
-const BIOGRAPHY_SCHEMA: EntrySchema<ContactBiography> = {
-  required: ["value"],
-  outputOnly: [],
-  subfields: { value: "string", contentType: "string" },
-};
-
-const URL_SCHEMA: EntrySchema<ContactUrl> = {
-  required: ["value"],
-  outputOnly: ["formattedType"],
-  subfields: { value: "string", type: "string", formattedType: "string" },
-};
-
-const BIRTHDAY_SCHEMA: EntrySchema<ContactBirthday> = {
-  required: [],
-  outputOnly: [],
-  subfields: { text: "string", date: "date" },
-};
-
-const EVENT_SCHEMA: EntrySchema<ContactEvent> = {
-  required: [],
-  outputOnly: ["formattedType"],
-  subfields: { type: "string", formattedType: "string", date: "date" },
-};
-
-const RELATION_SCHEMA: EntrySchema<ContactRelation> = {
-  required: ["person"],
-  outputOnly: ["formattedType"],
-  subfields: { person: "string", type: "string", formattedType: "string" },
-};
 
 export type ContactListField =
   | "names"
@@ -157,17 +37,96 @@ export type ContactListField =
 const OUTPUT_ONLY_SUBFIELDS: {
   readonly [K in ContactListField]: ReadonlySet<string>;
 } = {
-  names: new Set(NAME_SCHEMA.outputOnly),
-  phoneNumbers: new Set(PHONE_SCHEMA.outputOnly),
-  emailAddresses: new Set(EMAIL_SCHEMA.outputOnly),
-  addresses: new Set(ADDRESS_SCHEMA.outputOnly),
-  organizations: new Set(ORGANIZATION_SCHEMA.outputOnly),
-  biographies: new Set(BIOGRAPHY_SCHEMA.outputOnly),
-  urls: new Set(URL_SCHEMA.outputOnly),
-  birthdays: new Set(BIRTHDAY_SCHEMA.outputOnly),
-  events: new Set(EVENT_SCHEMA.outputOnly),
-  relations: new Set(RELATION_SCHEMA.outputOnly),
+  names: new Set(["displayName", "displayNameLastFirst"]),
+  phoneNumbers: new Set(["canonicalForm", "formattedType"]),
+  emailAddresses: new Set(["formattedType"]),
+  addresses: new Set(["formattedType"]),
+  organizations: new Set(["formattedType"]),
+  biographies: new Set(),
+  urls: new Set(["formattedType"]),
+  birthdays: new Set(),
+  events: new Set(["formattedType"]),
+  relations: new Set(["formattedType"]),
 };
+
+const NAME_KEYS = [
+  "displayName",
+  "displayNameLastFirst",
+  "unstructuredName",
+  "givenName",
+  "middleName",
+  "familyName",
+  "honorificPrefix",
+  "honorificSuffix",
+  "phoneticFullName",
+  "phoneticGivenName",
+  "phoneticMiddleName",
+  "phoneticFamilyName",
+  "phoneticHonorificPrefix",
+  "phoneticHonorificSuffix",
+] as const;
+
+const PHONE_OPTIONAL_KEYS = ["canonicalForm", "type", "formattedType"] as const;
+
+const EMAIL_OPTIONAL_KEYS = ["displayName", "type", "formattedType"] as const;
+
+const ADDRESS_KEYS = [
+  "formattedValue",
+  "poBox",
+  "streetAddress",
+  "extendedAddress",
+  "city",
+  "region",
+  "postalCode",
+  "country",
+  "countryCode",
+  "type",
+  "formattedType",
+] as const;
+
+const ORG_STRING_KEYS = [
+  "name",
+  "phoneticName",
+  "title",
+  "jobDescription",
+  "department",
+  "symbol",
+  "domain",
+  "location",
+  "costCenter",
+  "type",
+  "formattedType",
+] as const;
+
+const ORG_KNOWN_KEYS: ReadonlySet<string> = new Set([
+  "metadata",
+  ...ORG_STRING_KEYS,
+  "fullTimeEquivalentMillipercent",
+  "current",
+  "startDate",
+  "endDate",
+]);
+
+const BIOGRAPHY_OPTIONAL_KEYS = ["contentType"] as const;
+const URL_OPTIONAL_KEYS = ["type", "formattedType"] as const;
+const BIRTHDAY_STRING_KEYS = ["text"] as const;
+const EVENT_STRING_KEYS = ["type", "formattedType"] as const;
+const RELATION_OPTIONAL_KEYS = ["type", "formattedType"] as const;
+const RELATION_KNOWN_KEYS: ReadonlySet<string> = new Set([
+  "metadata",
+  "person",
+  ...RELATION_OPTIONAL_KEYS,
+]);
+
+const DATE_KEYS = ["year", "month", "day"] as const;
+const DATE_KEY_SET: ReadonlySet<string> = new Set(DATE_KEYS);
+const SOURCE_KEYS = ["type", "id", "etag", "updateTime"] as const;
+const SOURCE_KEY_SET: ReadonlySet<string> = new Set(SOURCE_KEYS);
+const METADATA_BOOL_KEYS = ["primary", "sourcePrimary", "verified"] as const;
+const METADATA_KEY_SET: ReadonlySet<string> = new Set([
+  ...METADATA_BOOL_KEYS,
+  "source",
+]);
 
 export function writableSubfieldKeys(
   field: ContactListField,
@@ -195,130 +154,245 @@ export function entryIdentity(field: ContactListField, entry: object): string {
   return canonicalJson(kept);
 }
 
-function isOptionalString(obj: object, key: string): boolean {
-  const value = ownValue(obj, key);
-  return value === undefined || typeof value === "string";
-}
-
-function isOptionalBoolean(obj: object, key: string): boolean {
-  const value = ownValue(obj, key);
-  return value === undefined || typeof value === "boolean";
-}
-
-function isDateValue(value: unknown): boolean {
-  const obj = asObject(value);
-  if (obj === null) return false;
-  return ["year", "month", "day"].every((key) => {
-    const part = ownValue(obj, key);
-    return part === undefined || ownNumber(obj, key) !== null;
-  });
-}
-
-function isFieldMetadataValue(value: unknown): boolean {
-  const obj = asObject(value);
-  if (obj === null) return false;
-  if (
-    !["primary", "sourcePrimary", "verified"].every((key) =>
-      isOptionalBoolean(obj, key),
-    )
-  ) {
-    return false;
+function attachUnmodelled<T extends object>(
+  decoded: T,
+  source: object,
+  knownKeys: ReadonlySet<string>,
+): T {
+  for (const key of Object.keys(source)) {
+    if (!knownKeys.has(key)) {
+      Object.defineProperty(decoded, key, {
+        value: ownValue(source, key),
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+    }
   }
-  const source = ownValue(obj, "source");
-  if (source === undefined) return true;
-  const sourceObj = asObject(source);
-  return (
-    sourceObj !== null &&
-    ["type", "id", "etag", "updateTime"].every((key) =>
-      isOptionalString(sourceObj, key),
-    )
+  return decoded;
+}
+
+function decodeOptionalStrings<K extends string>(
+  obj: object,
+  keys: readonly K[],
+): Partial<Record<K, string>> | null {
+  const out: Partial<Record<K, string>> = {};
+  for (const key of keys) {
+    if (!Object.hasOwn(obj, key)) continue;
+    const value = ownValue(obj, key);
+    if (typeof value !== "string") return null;
+    out[key] = value;
+  }
+  return out;
+}
+
+function decodeContactDate(value: unknown): ContactDate | null {
+  const obj = asObject(value);
+  if (obj === null) return null;
+  const out: { year?: number; month?: number; day?: number } = {};
+  for (const key of DATE_KEYS) {
+    const part = ownValue(obj, key);
+    if (part === undefined) continue;
+    const num = ownNumber(obj, key);
+    if (num === null) return null;
+    out[key] = num;
+  }
+  return attachUnmodelled(out, obj, DATE_KEY_SET);
+}
+
+function decodeOptionalDate(
+  obj: object,
+  key: string,
+): { readonly ok: true; readonly date?: ContactDate } | { readonly ok: false } {
+  if (!Object.hasOwn(obj, key)) return { ok: true };
+  const date = decodeContactDate(ownValue(obj, key));
+  return date === null ? { ok: false } : { ok: true, date };
+}
+
+function decodeFieldMetadataSource(
+  raw: unknown,
+): Partial<FieldMetadataSource> | null {
+  const obj = asObject(raw);
+  if (obj === null) return null;
+  const out: Partial<Record<(typeof SOURCE_KEYS)[number], string>> = {};
+  for (const key of SOURCE_KEYS) {
+    const value = ownValue(obj, key);
+    if (value === undefined) continue;
+    if (typeof value !== "string") return null;
+    out[key] = value;
+  }
+  return attachUnmodelled(out, obj, SOURCE_KEY_SET);
+}
+
+function decodeFieldMetadata(raw: unknown): FieldMetadata | null {
+  const obj = asObject(raw);
+  if (obj === null) return null;
+  const flags: Partial<Record<(typeof METADATA_BOOL_KEYS)[number], boolean>> =
+    {};
+  for (const key of METADATA_BOOL_KEYS) {
+    const value = ownValue(obj, key);
+    if (value === undefined) continue;
+    if (typeof value !== "boolean") return null;
+    flags[key] = value;
+  }
+  const rawSource = ownValue(obj, "source");
+  if (rawSource === undefined) {
+    return attachUnmodelled({ ...flags }, obj, METADATA_KEY_SET);
+  }
+  const source = decodeFieldMetadataSource(rawSource);
+  if (source === null) return null;
+  return attachUnmodelled({ ...flags, source }, obj, METADATA_KEY_SET);
+}
+
+function decodeEntryMetadata(
+  obj: object,
+):
+  | { readonly ok: true; readonly metadata?: FieldMetadata }
+  | { readonly ok: false } {
+  if (!Object.hasOwn(obj, "metadata")) return { ok: true };
+  const metadata = decodeFieldMetadata(ownValue(obj, "metadata"));
+  return metadata === null ? { ok: false } : { ok: true, metadata };
+}
+
+function decodeStringEntry<K extends string>(
+  raw: unknown,
+  keys: readonly K[],
+): (Partial<Record<K, string>> & { readonly metadata?: FieldMetadata }) | null {
+  const obj = asObject(raw);
+  if (obj === null) return null;
+  const strings = decodeOptionalStrings(obj, keys);
+  const meta = decodeEntryMetadata(obj);
+  if (strings === null || !meta.ok) return null;
+  const decoded = {
+    ...strings,
+    ...(meta.metadata !== undefined ? { metadata: meta.metadata } : {}),
+  };
+  return attachUnmodelled(decoded, obj, new Set(["metadata", ...keys]));
+}
+
+function decodeValueEntry<K extends string>(
+  raw: unknown,
+  optionalKeys: readonly K[],
+):
+  | ({ readonly value: string; readonly metadata?: FieldMetadata } & Partial<
+      Record<K, string>
+    >)
+  | null {
+  const obj = asObject(raw);
+  if (obj === null) return null;
+  const value = ownString(obj, "value");
+  const rest = decodeOptionalStrings(obj, optionalKeys);
+  const meta = decodeEntryMetadata(obj);
+  if (value === null || rest === null || !meta.ok) return null;
+  const decoded = {
+    value,
+    ...rest,
+    ...(meta.metadata !== undefined ? { metadata: meta.metadata } : {}),
+  };
+  return attachUnmodelled(
+    decoded,
+    obj,
+    new Set(["metadata", "value", ...optionalKeys]),
   );
 }
 
-function matchesSubfieldKind(kind: SubfieldKind, value: unknown): boolean {
-  if (kind === "string") return typeof value === "string";
-  if (kind === "boolean") return typeof value === "boolean";
-  if (kind === "number") {
-    return typeof value === "number" && Number.isFinite(value);
-  }
-  return isDateValue(value);
-}
-
-function subfieldKindOf<T>(
-  schema: EntrySchema<T>,
-  key: string,
-): SubfieldKind | undefined {
-  const kind: unknown = ownValue(schema.subfields, key);
-  return kind === "string" ||
-    kind === "boolean" ||
-    kind === "number" ||
-    kind === "date"
-    ? kind
-    : undefined;
-}
-
-function entryMatchesSchema<T extends object>(
-  entry: object,
-  schema: EntrySchema<T>,
-): entry is T {
-  for (const key of Object.keys(entry)) {
-    const value = ownValue(entry, key);
-    if (key === "metadata") {
-      if (!isFieldMetadataValue(value)) return false;
-      continue;
-    }
-    const kind = subfieldKindOf(schema, key);
-    if (kind !== undefined && !matchesSubfieldKind(kind, value)) return false;
-  }
-  return schema.required.every((key) => ownString(entry, key) !== null);
-}
-
-function decodeEntry<T extends object>(
+function decodeDatedEntry<K extends string>(
   raw: unknown,
-  schema: EntrySchema<T>,
-): T | null {
+  stringKeys: readonly K[],
+):
+  | (Partial<Record<K, string>> & {
+      readonly date?: ContactDate;
+      readonly metadata?: FieldMetadata;
+    })
+  | null {
   const obj = asObject(raw);
-  return obj !== null && entryMatchesSchema(obj, schema) ? obj : null;
+  if (obj === null) return null;
+  const strings = decodeOptionalStrings(obj, stringKeys);
+  const date = decodeOptionalDate(obj, "date");
+  const meta = decodeEntryMetadata(obj);
+  if (strings === null || !date.ok || !meta.ok) return null;
+  const decoded = {
+    ...strings,
+    ...(date.date !== undefined ? { date: date.date } : {}),
+    ...(meta.metadata !== undefined ? { metadata: meta.metadata } : {}),
+  };
+  return attachUnmodelled(
+    decoded,
+    obj,
+    new Set(["metadata", "date", ...stringKeys]),
+  );
 }
 
 function decodeName(raw: unknown): ContactName | null {
-  return decodeEntry(raw, NAME_SCHEMA);
+  return decodeStringEntry(raw, NAME_KEYS);
 }
 
 export function decodePhone(raw: unknown): ContactPhone | null {
-  return decodeEntry(raw, PHONE_SCHEMA);
+  return decodeValueEntry(raw, PHONE_OPTIONAL_KEYS);
 }
 
 function decodeEmail(raw: unknown): ContactEmail | null {
-  return decodeEntry(raw, EMAIL_SCHEMA);
+  return decodeValueEntry(raw, EMAIL_OPTIONAL_KEYS);
 }
 
 function decodeAddress(raw: unknown): ContactAddress | null {
-  return decodeEntry(raw, ADDRESS_SCHEMA);
+  return decodeStringEntry(raw, ADDRESS_KEYS);
 }
 
 function decodeOrganization(raw: unknown): ContactOrganization | null {
-  return decodeEntry(raw, ORGANIZATION_SCHEMA);
+  const obj = asObject(raw);
+  if (obj === null) return null;
+  const strings = decodeOptionalStrings(obj, ORG_STRING_KEYS);
+  const startDate = decodeOptionalDate(obj, "startDate");
+  const endDate = decodeOptionalDate(obj, "endDate");
+  const meta = decodeEntryMetadata(obj);
+  if (strings === null || !startDate.ok || !endDate.ok || !meta.ok) return null;
+  const hasFte = Object.hasOwn(obj, "fullTimeEquivalentMillipercent");
+  const fte = hasFte ? ownNumber(obj, "fullTimeEquivalentMillipercent") : null;
+  if (hasFte && fte === null) return null;
+  const hasCurrent = Object.hasOwn(obj, "current");
+  const rawCurrent = hasCurrent ? ownValue(obj, "current") : undefined;
+  if (hasCurrent && typeof rawCurrent !== "boolean") return null;
+  const decoded: ContactOrganization = {
+    ...strings,
+    ...(fte !== null ? { fullTimeEquivalentMillipercent: fte } : {}),
+    ...(typeof rawCurrent === "boolean" ? { current: rawCurrent } : {}),
+    ...(startDate.date !== undefined ? { startDate: startDate.date } : {}),
+    ...(endDate.date !== undefined ? { endDate: endDate.date } : {}),
+    ...(meta.metadata !== undefined ? { metadata: meta.metadata } : {}),
+  };
+  return attachUnmodelled(decoded, obj, ORG_KNOWN_KEYS);
 }
 
 function decodeBiography(raw: unknown): ContactBiography | null {
-  return decodeEntry(raw, BIOGRAPHY_SCHEMA);
+  return decodeValueEntry(raw, BIOGRAPHY_OPTIONAL_KEYS);
 }
 
 function decodeUrl(raw: unknown): ContactUrl | null {
-  return decodeEntry(raw, URL_SCHEMA);
+  return decodeValueEntry(raw, URL_OPTIONAL_KEYS);
 }
 
 function decodeBirthday(raw: unknown): ContactBirthday | null {
-  return decodeEntry(raw, BIRTHDAY_SCHEMA);
+  return decodeDatedEntry(raw, BIRTHDAY_STRING_KEYS);
 }
 
 function decodeEvent(raw: unknown): ContactEvent | null {
-  return decodeEntry(raw, EVENT_SCHEMA);
+  return decodeDatedEntry(raw, EVENT_STRING_KEYS);
 }
 
 function decodeRelation(raw: unknown): ContactRelation | null {
-  return decodeEntry(raw, RELATION_SCHEMA);
+  const obj = asObject(raw);
+  if (obj === null) return null;
+  const person = ownString(obj, "person");
+  const rest = decodeOptionalStrings(obj, RELATION_OPTIONAL_KEYS);
+  const meta = decodeEntryMetadata(obj);
+  if (person === null || rest === null || !meta.ok) return null;
+  const decoded: ContactRelation = {
+    person,
+    ...rest,
+    ...(meta.metadata !== undefined ? { metadata: meta.metadata } : {}),
+  };
+  return attachUnmodelled(decoded, obj, RELATION_KNOWN_KEYS);
 }
 
 function decodeEntryList<T>(

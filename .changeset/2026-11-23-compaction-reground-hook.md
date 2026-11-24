@@ -1,0 +1,7 @@
+---
+"skills": minor
+---
+
+Added a Claude Code SessionStart hook to the plugin that puts a short reground note back into a registered coordinator session's context after compaction, and stays silent for every other session. The hook reads its roster from the state folder set by COORDINATION_STATE_DIR, which defaults to $XDG_STATE_HOME/my-agent-dojo/agent-coordination or $HOME/.local/state/my-agent-dojo/agent-coordination.
+
+Action: To opt a coordinator session in, write its roster entry under <state folder>/coordinator-roster as the README's Hooks section shows. Set COORDINATION_STATE_DIR in the environment Claude Code starts with to move the state folder. The hook needs bun on PATH.

@@ -2,6 +2,7 @@ import { expect } from "bun:test";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ContactRecord } from "../../src/google-contacts/domain/rules.ts";
+import { decodeMutationPlanDoc } from "../../src/google-contacts/plan-decoders/rules.ts";
 import { computePlanSeal } from "../../src/google-contacts/plan-types/rules.ts";
 import type {
   MutationPlanBody,
@@ -21,12 +22,13 @@ export type ForgedRow = {
   readonly forge: (body: MutationPlanBody) => MutationPlanBody;
 };
 
-export function isPlanDoc(value: unknown): value is MutationPlanDoc {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    Reflect.get(value, "schemaVersion") === "contacts-plan/1"
-  );
+export function requirePlanDoc(
+  value: unknown,
+  message = "No plan document.",
+): MutationPlanDoc {
+  const plan = decodeMutationPlanDoc(value);
+  if (plan === null) throw new Error(message);
+  return plan;
 }
 
 function bodyOf(plan: MutationPlanDoc): MutationPlanBody {
@@ -63,8 +65,8 @@ export async function applyForgedRow(
   expect(`${row.name}: ${honest.run.causeCode}`).toBe(
     `${row.name}: SUCCESS_UNCHANGED`,
   );
-  if (!isPlanDoc(honest.run.data)) throw new Error("No plan document.");
-  const forged = row.forge(bodyOf(honest.run.data));
+  const plan = requirePlanDoc(honest.run.data);
+  const forged = row.forge(bodyOf(plan));
   const seal = computePlanSeal(forged).value;
   const forgedFile = join(dir, "forged.json");
   writeFileSync(forgedFile, JSON.stringify({ ...forged, seal }), "utf8");

@@ -21,12 +21,6 @@ interface ProcessOutput {
   stderr: string;
 }
 
-interface RootHooksConfig {
-  "coordinator-compaction-reground"?: {
-    PreInvocation?: Array<{ type: string; command: string; timeout: number }>;
-  };
-}
-
 interface Fixture {
   stateDir: string;
   transcriptFile: string;
@@ -191,14 +185,19 @@ function copyPluginReadOnly(): string {
   return dest;
 }
 
+function readPreInvocationHooks(hooksPath: string): unknown {
+  const parsed: unknown = JSON.parse(readFileSync(hooksPath, "utf8"));
+  if (typeof parsed !== "object" || parsed === null) return undefined;
+  const entry: unknown = Reflect.get(parsed, "coordinator-compaction-reground");
+  if (typeof entry !== "object" || entry === null) return undefined;
+  return Reflect.get(entry, "PreInvocation");
+}
+
 describe("Antigravity root hooks.json and 0644 execution", () => {
   test("declares coordinator-compaction-reground PreInvocation command with timeout 5", () => {
     const hooksPath = join(repoRoot, "hooks.json");
     expect(existsSync(hooksPath)).toBe(true);
-    const config = JSON.parse(
-      readFileSync(hooksPath, "utf8"),
-    ) as RootHooksConfig;
-    expect(config["coordinator-compaction-reground"]?.PreInvocation).toEqual([
+    expect(readPreInvocationHooks(hooksPath)).toEqual([
       {
         type: "command",
         command:
@@ -212,12 +211,13 @@ describe("Antigravity root hooks.json and 0644 execution", () => {
     const pluginRoot = copyPluginReadOnly();
     const { stateDir, transcriptFile } = createFixture();
     appendFileSync(transcriptFile, checkpointStep(4));
-    const config = JSON.parse(
-      readFileSync(join(pluginRoot, "hooks.json"), "utf8"),
-    ) as RootHooksConfig;
-    const command =
-      config["coordinator-compaction-reground"]?.PreInvocation?.[0]?.command ??
-      "";
+    const hooks = readPreInvocationHooks(join(pluginRoot, "hooks.json"));
+    const first: unknown = Array.isArray(hooks) ? hooks[0] : undefined;
+    const rawCommand: unknown =
+      typeof first === "object" && first !== null
+        ? Reflect.get(first, "command")
+        : undefined;
+    const command = typeof rawCommand === "string" ? rawCommand : "";
     const output = invokeWrapper(
       agyPayload(transcriptFile),
       agyEnv(stateDir, { PATH: `${bunDir}:/bin` }),

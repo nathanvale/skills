@@ -92,8 +92,10 @@ function stateFolder(): string | null {
   return null;
 }
 
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
+function asJsonObject(value: unknown): object | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : null;
 }
 
 function regularFileSize(path: string): number | null {
@@ -110,17 +112,17 @@ function isUsableEntry(path: string, kind: "directory" | "file"): boolean {
     const info = lstatSync(path);
     return kind === "directory" ? info.isDirectory() : info.isFile();
   } catch (error: unknown) {
-    return isJsonObject(error) && error.code === "ENOENT";
+    const obj = asJsonObject(error);
+    return obj !== null && Reflect.get(obj, "code") === "ENOENT";
   }
 }
 
-function isSafeIntegerAtLeast(
-  value: unknown,
-  minimum: number,
-): value is number {
-  return (
-    typeof value === "number" && Number.isSafeInteger(value) && value >= minimum
-  );
+function safeIntegerAtLeast(value: unknown, minimum: number): number | null {
+  return typeof value === "number" &&
+    Number.isSafeInteger(value) &&
+    value >= minimum
+    ? value
+    : null;
 }
 
 function readSlice(path: string, offset: number, length: number): Buffer {
@@ -164,48 +166,44 @@ function coordinatorFolder(path: string): string | null {
   return COORDINATOR_FOLDER_PATTERN.test(first) ? first : null;
 }
 
-function hasSubagentMarker(input: Record<string, unknown>): boolean {
-  const hasAgentId =
-    input.agent_id !== undefined &&
-    input.agent_id !== null &&
-    input.agent_id !== "";
+function hasSubagentMarker(input: object): boolean {
+  const agentId: unknown = Reflect.get(input, "agent_id");
+  const transcriptPath: unknown = Reflect.get(input, "transcript_path");
   return (
-    hasAgentId ||
-    (typeof input.transcript_path === "string" &&
-      input.transcript_path.includes("/subagents/"))
+    (agentId !== undefined && agentId !== null && agentId !== "") ||
+    (typeof transcriptPath === "string" &&
+      transcriptPath.includes("/subagents/"))
   );
 }
 
-function claudeSessionId(input: Record<string, unknown>): string | null {
+function claudeSessionId(input: object): string | null {
+  const sessionId: unknown = Reflect.get(input, "session_id");
   if (
-    input.hook_event_name !== "SessionStart" ||
-    input.source !== "compact" ||
+    Reflect.get(input, "hook_event_name") !== "SessionStart" ||
+    Reflect.get(input, "source") !== "compact" ||
     hasSubagentMarker(input) ||
-    typeof input.session_id !== "string" ||
-    !SESSION_ID_PATTERN.test(input.session_id)
+    typeof sessionId !== "string" ||
+    !SESSION_ID_PATTERN.test(sessionId)
   ) {
     return null;
   }
-  return input.session_id;
+  return sessionId;
 }
 
-function antigravityRequest(
-  input: Record<string, unknown>,
-): AntigravityRequest | null {
+function antigravityRequest(input: object): AntigravityRequest | null {
+  const conversationId: unknown = Reflect.get(input, "conversationId");
+  const transcriptPath: unknown = Reflect.get(input, "transcriptPath");
   if (
-    input.hookEventName !== "PreInvocation" ||
-    typeof input.conversationId !== "string" ||
-    !SESSION_ID_PATTERN.test(input.conversationId) ||
-    typeof input.transcriptPath !== "string" ||
-    !isAbsolute(input.transcriptPath) ||
-    input.transcriptPath.includes("/subagents/")
+    Reflect.get(input, "hookEventName") !== "PreInvocation" ||
+    typeof conversationId !== "string" ||
+    !SESSION_ID_PATTERN.test(conversationId) ||
+    typeof transcriptPath !== "string" ||
+    !isAbsolute(transcriptPath) ||
+    transcriptPath.includes("/subagents/")
   ) {
     return null;
   }
-  return {
-    conversationId: input.conversationId,
-    transcriptPath: input.transcriptPath,
-  };
+  return { conversationId, transcriptPath };
 }
 
 function validPrefixSha256(value: unknown, bytes: number): string {
@@ -217,23 +215,27 @@ function validPrefixSha256(value: unknown, bytes: number): string {
 }
 
 function readCursor(path: string): CompactionCursor {
-  if (regularFileSize(path) === null) {
-    return EMPTY_CURSOR;
-  }
+  if (regularFileSize(path) === null) return EMPTY_CURSOR;
   try {
     const raw = readSlice(path, 0, CURSOR_HEAD_BYTES).toString("utf8");
-    const parsed: unknown = JSON.parse(raw);
-    if (!isJsonObject(parsed)) {
-      return EMPTY_CURSOR;
-    }
-    const { lastCheckpointStep: step, lastScannedBytes: bytes } = parsed;
-    if (!isSafeIntegerAtLeast(step, -1) || !isSafeIntegerAtLeast(bytes, 0)) {
-      return EMPTY_CURSOR;
-    }
+    const parsed = asJsonObject(JSON.parse(raw));
+    if (parsed === null) return EMPTY_CURSOR;
+    const step = safeIntegerAtLeast(
+      Reflect.get(parsed, "lastCheckpointStep"),
+      -1,
+    );
+    const bytes = safeIntegerAtLeast(
+      Reflect.get(parsed, "lastScannedBytes"),
+      0,
+    );
+    if (step === null || bytes === null) return EMPTY_CURSOR;
     return {
       lastCheckpointStep: step,
       lastScannedBytes: bytes,
-      prefixSha256: validPrefixSha256(parsed.prefixSha256, bytes),
+      prefixSha256: validPrefixSha256(
+        Reflect.get(parsed, "prefixSha256"),
+        bytes,
+      ),
     };
   } catch {
     return EMPTY_CURSOR;
@@ -293,16 +295,15 @@ function checkpointStepFromLine(line: string): number {
     return -1;
   }
   try {
-    const parsed: unknown = JSON.parse(line);
+    const parsed = asJsonObject(JSON.parse(line));
     if (
-      !isJsonObject(parsed) ||
-      parsed.type !== "CHECKPOINT" ||
-      parsed.status !== "DONE" ||
-      !isSafeIntegerAtLeast(parsed.step_index, 0)
+      parsed === null ||
+      Reflect.get(parsed, "type") !== "CHECKPOINT" ||
+      Reflect.get(parsed, "status") !== "DONE"
     ) {
       return -1;
     }
-    return parsed.step_index;
+    return safeIntegerAtLeast(Reflect.get(parsed, "step_index"), 0) ?? -1;
   } catch {
     return -1;
   }
@@ -453,15 +454,15 @@ function regroundHookOutputLine(
   rawInput: string,
   antigravityFlag: boolean,
 ): string | null {
-  const input: unknown = JSON.parse(rawInput);
-  if (!isJsonObject(input)) {
+  const input = asJsonObject(JSON.parse(rawInput));
+  if (input === null) {
     return antigravityFlag ? ANTIGRAVITY_EMPTY_OUTPUT : null;
   }
 
   const isAntigravity =
     antigravityFlag ||
-    typeof input.hookEventName === "string" ||
-    typeof input.conversationId === "string";
+    typeof Reflect.get(input, "hookEventName") === "string" ||
+    typeof Reflect.get(input, "conversationId") === "string";
   const state = stateFolder();
   if (!state) {
     return isAntigravity ? ANTIGRAVITY_EMPTY_OUTPUT : null;

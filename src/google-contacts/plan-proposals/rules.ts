@@ -6,6 +6,7 @@ import type {
   ContactRecord,
   ContactSnapshotDoc,
   EvidenceItem,
+  FieldMetadata,
 } from "../domain/rules.ts";
 import {
   biographyEntryWithValue,
@@ -76,11 +77,7 @@ function resolveProposalConfidence(
   return distinct.size >= 2 ? "high" : "medium";
 }
 
-function mergeArray<
-  T extends {
-    readonly metadata?: { readonly source?: { readonly type: string } };
-  },
->(
+function mergeArray<T extends { readonly metadata?: FieldMetadata }>(
   existing: readonly T[],
   added: readonly T[] | undefined,
 ): readonly T[] | undefined {

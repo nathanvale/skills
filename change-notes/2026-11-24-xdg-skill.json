@@ -1,7 +1,0 @@
-{
-  "kind": "added",
-  "breaking": false,
-  "affects": ["skills", "plugin", "claude-code-plugin"],
-  "summary": "Added the model-invoked xdg engineering skill with XDG Base Directory v0.8 path rules and primary source references.",
-  "action": null
-}
