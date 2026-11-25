@@ -7,9 +7,21 @@ setDefaultTimeout(30_000);
 
 const cli = join(import.meta.dir, "../src/cli.ts");
 
-function runDoctor(home: string, extraArgs: readonly string[] = []) {
+function runFloatingSkillCheck(
+  home: string,
+  extraArgs: readonly string[] = [],
+) {
   const ran = Bun.spawnSync(
-    [process.execPath, "run", cli, "doctor", "--home", home, ...extraArgs],
+    [
+      process.execPath,
+      "run",
+      cli,
+      "floating-skill",
+      "check",
+      "--home",
+      home,
+      ...extraArgs,
+    ],
     { stdout: "pipe", stderr: "pipe", timeout: 20_000 },
   );
   return {
@@ -19,14 +31,14 @@ function runDoctor(home: string, extraArgs: readonly string[] = []) {
   };
 }
 
-function runDoctorFindings(home: string, extraArgs: readonly string[] = []) {
+function runFloatingSkillList(home: string, extraArgs: readonly string[] = []) {
   const ran = Bun.spawnSync(
     [
       process.execPath,
       "run",
       cli,
-      "doctor",
-      "findings",
+      "floating-skill",
+      "list",
       "--home",
       home,
       ...extraArgs,
@@ -47,8 +59,8 @@ function writeSkill(skillDir: string): string {
   return skillFile;
 }
 
-test("doctor and doctor findings pass on an empty home and report the four checked folders", () => {
-  const home = testFolder("skills-doctor-empty-");
+test("floating-skill check and floating-skill list pass on an empty home and report the four checked folders", () => {
+  const home = testFolder("floating-skill-empty-");
   try {
     const expectedFolders = [
       join(home, ".claude/skills"),
@@ -57,7 +69,7 @@ test("doctor and doctor findings pass on an empty home and report the four check
       join(home, ".gemini/config/skills"),
     ];
 
-    const ran = runDoctor(home, ["--json"]);
+    const ran = runFloatingSkillCheck(home, ["--json"]);
     expect({ exitCode: ran.exitCode, stderr: ran.stderr }).toEqual({
       exitCode: 0,
       stderr: "",
@@ -65,7 +77,7 @@ test("doctor and doctor findings pass on an empty home and report the four check
     const parsed: unknown = JSON.parse(ran.stdout);
     expect(parsed).toMatchObject({
       result: {
-        commandIdentity: "skills.doctor",
+        commandIdentity: "skills.floating-skill.check",
         causeCode: "SUCCESS_UNCHANGED",
         outcome: "success",
         exitCode: 0,
@@ -77,7 +89,7 @@ test("doctor and doctor findings pass on an empty home and report the four check
       },
     });
 
-    const findingsRan = runDoctorFindings(home, ["--json"]);
+    const findingsRan = runFloatingSkillList(home, ["--json"]);
     expect({
       exitCode: findingsRan.exitCode,
       stderr: findingsRan.stderr,
@@ -88,7 +100,7 @@ test("doctor and doctor findings pass on an empty home and report the four check
     const findingsParsed: unknown = JSON.parse(findingsRan.stdout);
     expect(findingsParsed).toMatchObject({
       result: {
-        commandIdentity: "skills.doctor.findings",
+        commandIdentity: "skills.floating-skill.list",
         causeCode: "SUCCESS_UNCHANGED",
         outcome: "success",
         exitCode: 0,
@@ -104,43 +116,43 @@ test("doctor and doctor findings pass on an empty home and report the four check
   }
 });
 
-test("doctor refuses when a skill is planted under .agents/skills and points next to doctor findings", () => {
-  const home = testFolder("skills-doctor-planted-");
+test("floating-skill check refuses when a skill is planted under .agents/skills and points next to floating-skill list", () => {
+  const home = testFolder("floating-skill-planted-");
   try {
     const planted = writeSkill(join(home, ".agents/skills/planted"));
-    const ran = runDoctor(home, ["--json"]);
+    const ran = runFloatingSkillCheck(home, ["--json"]);
     expect({ exitCode: ran.exitCode, stderr: ran.stderr }).toEqual({
       exitCode: 3,
       stderr: "",
     });
     const parsed: unknown = JSON.parse(ran.stdout);
     expect(parsed).toMatchObject({
-      message: `[floating-skill] 1 floating skill(s) found: ${planted}; run \`skills doctor findings\` for the full list. Repair: move the skill into one of the plugins, or into the repository it serves, or uninstall it. See agent-engineering ADR 0003.`,
+      message: `[floating-skill] 1 floating skill(s) found: ${planted}; run \`skills floating-skill list\` for the full list. Repair: move the skill into one of the plugins, or into the repository it serves, or uninstall it. See agent-engineering ADR 0003.`,
       result: {
-        commandIdentity: "skills.doctor",
+        commandIdentity: "skills.floating-skill.check",
         causeCode: "DOMAIN_FLOATING_SKILLS",
         outcome: "refused",
         exitCode: 3,
         data: null,
         next: {
           kind: "command",
-          command: "skills.doctor.findings",
+          command: "skills.floating-skill.list",
           args: [],
         },
       },
     });
 
-    const plain = runDoctor(home);
+    const plain = runFloatingSkillCheck(home);
     expect(plain.exitCode).toBe(3);
     expect(plain.stdout).toBe("");
     expect(plain.stderr).toContain("[floating-skill]");
     expect(plain.stderr).toContain(planted);
     expect(plain.stderr).toContain(
-      "run `skills doctor findings` for the full list",
+      "run `skills floating-skill list` for the full list",
     );
     expect(plain.stderr).toContain("[DOMAIN_FLOATING_SKILLS]");
 
-    const findingsRan = runDoctorFindings(home, ["--json"]);
+    const findingsRan = runFloatingSkillList(home, ["--json"]);
     expect({
       exitCode: findingsRan.exitCode,
       stderr: findingsRan.stderr,
@@ -151,7 +163,7 @@ test("doctor refuses when a skill is planted under .agents/skills and points nex
     const findingsParsed: unknown = JSON.parse(findingsRan.stdout);
     expect(findingsParsed).toMatchObject({
       result: {
-        commandIdentity: "skills.doctor.findings",
+        commandIdentity: "skills.floating-skill.list",
         causeCode: "SUCCESS_UNCHANGED",
         outcome: "success",
         exitCode: 0,
@@ -171,14 +183,14 @@ test("doctor refuses when a skill is planted under .agents/skills and points nex
   }
 });
 
-test("doctor caps its refusal message to the first five paths while doctor findings returns all of them", () => {
-  const home = testFolder("skills-doctor-many-");
+test("floating-skill check caps its refusal message to the first five paths while floating-skill list returns all of them", () => {
+  const home = testFolder("floating-skill-many-");
   try {
     const plantedPaths = [1, 2, 3, 4, 5, 6, 7].map((index) =>
       writeSkill(join(home, `.agents/skills/skill-${String(index)}`)),
     );
 
-    const ran = runDoctor(home, ["--json"]);
+    const ran = runFloatingSkillCheck(home, ["--json"]);
     expect({ exitCode: ran.exitCode, stderr: ran.stderr }).toEqual({
       exitCode: 3,
       stderr: "",
@@ -186,9 +198,9 @@ test("doctor caps its refusal message to the first five paths while doctor findi
     const parsed: unknown = JSON.parse(ran.stdout);
     const firstFive = plantedPaths.slice(0, 5).join(", ");
     expect(parsed).toMatchObject({
-      message: `[floating-skill] 7 floating skill(s) found: ${firstFive}, and 2 more; run \`skills doctor findings\` for the full list. Repair: move the skill into one of the plugins, or into the repository it serves, or uninstall it. See agent-engineering ADR 0003.`,
+      message: `[floating-skill] 7 floating skill(s) found: ${firstFive}, and 2 more; run \`skills floating-skill list\` for the full list. Repair: move the skill into one of the plugins, or into the repository it serves, or uninstall it. See agent-engineering ADR 0003.`,
       result: {
-        commandIdentity: "skills.doctor",
+        commandIdentity: "skills.floating-skill.check",
         causeCode: "DOMAIN_FLOATING_SKILLS",
         outcome: "refused",
         exitCode: 3,
@@ -196,7 +208,7 @@ test("doctor caps its refusal message to the first five paths while doctor findi
       },
     });
 
-    const findingsRan = runDoctorFindings(home, ["--json"]);
+    const findingsRan = runFloatingSkillList(home, ["--json"]);
     expect({
       exitCode: findingsRan.exitCode,
       stderr: findingsRan.stderr,
@@ -207,7 +219,7 @@ test("doctor caps its refusal message to the first five paths while doctor findi
     const findingsParsed: unknown = JSON.parse(findingsRan.stdout);
     expect(findingsParsed).toMatchObject({
       result: {
-        commandIdentity: "skills.doctor.findings",
+        commandIdentity: "skills.floating-skill.list",
         causeCode: "SUCCESS_UNCHANGED",
         outcome: "success",
         exitCode: 0,
@@ -225,9 +237,9 @@ test("doctor caps its refusal message to the first five paths while doctor findi
   }
 });
 
-test("doctor and doctor findings report symlinked skill directories and symlinked SKILL.md files with their targets", () => {
-  const home = testFolder("skills-doctor-symlink-");
-  const targetRoot = testFolder("skills-doctor-target-");
+test("floating-skill check and floating-skill list report symlinked skill directories and symlinked SKILL.md files with their targets", () => {
+  const home = testFolder("floating-skill-symlink-");
+  const targetRoot = testFolder("floating-skill-target-");
   try {
     const dirTarget = join(targetRoot, "linked-dir-source");
     writeSkill(dirTarget);
@@ -239,7 +251,7 @@ test("doctor and doctor findings report symlinked skill directories and symlinke
     mkdirSync(claudeSkillDir, { recursive: true });
     symlinkSync(fileTarget, join(claudeSkillDir, "SKILL.md"));
 
-    const ran = runDoctor(home, ["--json"]);
+    const ran = runFloatingSkillCheck(home, ["--json"]);
     expect({ exitCode: ran.exitCode, stderr: ran.stderr }).toEqual({
       exitCode: 3,
       stderr: "",
@@ -248,9 +260,9 @@ test("doctor and doctor findings report symlinked skill directories and symlinke
     const expectedFileLink = join(claudeSkillDir, "SKILL.md");
     const parsed: unknown = JSON.parse(ran.stdout);
     expect(parsed).toMatchObject({
-      message: `[floating-skill] 2 floating skill(s) found: ${expectedFileLink} -> ${fileTarget}, ${expectedDirLink} -> ${dirTarget}; run \`skills doctor findings\` for the full list. Repair: move the skill into one of the plugins, or into the repository it serves, or uninstall it. See agent-engineering ADR 0003.`,
+      message: `[floating-skill] 2 floating skill(s) found: ${expectedFileLink} -> ${fileTarget}, ${expectedDirLink} -> ${dirTarget}; run \`skills floating-skill list\` for the full list. Repair: move the skill into one of the plugins, or into the repository it serves, or uninstall it. See agent-engineering ADR 0003.`,
       result: {
-        commandIdentity: "skills.doctor",
+        commandIdentity: "skills.floating-skill.check",
         causeCode: "DOMAIN_FLOATING_SKILLS",
         outcome: "refused",
         exitCode: 3,
@@ -258,7 +270,7 @@ test("doctor and doctor findings report symlinked skill directories and symlinke
       },
     });
 
-    const findingsRan = runDoctorFindings(home, ["--json"]);
+    const findingsRan = runFloatingSkillList(home, ["--json"]);
     expect({
       exitCode: findingsRan.exitCode,
       stderr: findingsRan.stderr,
@@ -269,7 +281,7 @@ test("doctor and doctor findings report symlinked skill directories and symlinke
     const findingsParsed: unknown = JSON.parse(findingsRan.stdout);
     expect(findingsParsed).toMatchObject({
       result: {
-        commandIdentity: "skills.doctor.findings",
+        commandIdentity: "skills.floating-skill.list",
         causeCode: "SUCCESS_UNCHANGED",
         outcome: "success",
         exitCode: 0,
@@ -294,14 +306,14 @@ test("doctor and doctor findings report symlinked skill directories and symlinke
   }
 });
 
-test("doctor ignores the three tool-owned app folders", () => {
-  const home = testFolder("skills-doctor-app-folders-");
+test("floating-skill check ignores the three tool-owned app folders", () => {
+  const home = testFolder("floating-skill-app-folders-");
   try {
     writeSkill(join(home, ".codex/skills/.system"));
     writeSkill(join(home, ".claude/skills/.trash"));
     writeSkill(join(home, ".claude/skills/synced"));
 
-    const ran = runDoctor(home, ["--json"]);
+    const ran = runFloatingSkillCheck(home, ["--json"]);
     expect({ exitCode: ran.exitCode, stderr: ran.stderr }).toEqual({
       exitCode: 0,
       stderr: "",
@@ -309,7 +321,7 @@ test("doctor ignores the three tool-owned app folders", () => {
     const parsed: unknown = JSON.parse(ran.stdout);
     expect(parsed).toMatchObject({
       result: {
-        commandIdentity: "skills.doctor",
+        commandIdentity: "skills.floating-skill.check",
         causeCode: "SUCCESS_UNCHANGED",
         outcome: "success",
         exitCode: 0,

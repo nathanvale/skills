@@ -15,7 +15,7 @@ type FloatingSkill = {
   readonly symlinkTarget: string | null;
 };
 
-type DoctorReport = {
+type FloatingSkillReport = {
   readonly home: string;
   readonly checkedFolders: readonly string[];
   readonly findings: readonly FloatingSkill[];
@@ -141,7 +141,9 @@ function scanUserSkillFolder(
   }
 }
 
-export function inspectUserSkillFolders(homeInput?: string): DoctorReport {
+export function inspectUserSkillFolders(
+  homeInput?: string,
+): FloatingSkillReport {
   const home = resolve(homeInput ?? homedir());
   const checkedFolders = USER_SKILL_FOLDERS.map((folder) => join(home, folder));
   const findings: FloatingSkill[] = [];

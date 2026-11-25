@@ -37,5 +37,5 @@ Validation rule `manifest-drift`. A mismatch between promoted skills under `skil
 _Avoid_: Manifest desync
 
 **Floating skill**:
-Doctor rule `floating-skill`. A `SKILL.md` file (or symlink to one) sitting in a user-level agent skills folder (`.claude/skills`, `.agents/skills`, `.codex/skills`, or `.gemini/config/skills`) outside a plugin or repository, excluding tool-owned app folders. See agent-engineering ADR 0003.
+Rule `floating-skill`. A `SKILL.md` file (or symlink to one) sitting in a user-level agent skills folder (`.claude/skills`, `.agents/skills`, `.codex/skills`, or `.gemini/config/skills`) outside a plugin or repository, excluding tool-owned app folders. See agent-engineering ADR 0003.
 _Avoid_: Loose skill, unmanaged skill

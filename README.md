@@ -13,13 +13,13 @@ bun install --frozen-lockfile
 bun run start -- --help
 bun run start -- list
 bun run start -- validate
-bun run start -- doctor
-bun run start -- doctor findings
+bun run start -- floating-skill check
+bun run start -- floating-skill list
 bun run start -- greet World
 bun run check
 ```
 
-`bun run start -- doctor` checks user-level skill folders for floating skills per agent-engineering ADR 0003 and exits 3 when any exist (`--home <path>` overrides the home directory); `bun run start -- doctor findings` returns the full report as typed data and exits 0.
+`bun run start -- floating-skill check` checks user-level skill folders for floating skills per agent-engineering ADR 0003 and exits 3 when any exist (`--home <path>` overrides the home directory); `bun run start -- floating-skill list` returns the full report as typed data and exits 0.
 
 ## Installation
 
