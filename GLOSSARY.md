@@ -35,3 +35,7 @@ _Avoid_: Orphan skill, misplaced skill
 **Manifest drift**:
 Validation rule `manifest-drift`. A mismatch between promoted skills under `skills/` and the `"skills"` array in `plugin.json` or `.claude-plugin/plugin.json`.
 _Avoid_: Manifest desync
+
+**Floating skill**:
+Rule `floating-skill`. A `SKILL.md` file (or symlink to one) sitting in a user-level agent skills folder (`.claude/skills`, `.agents/skills`, `.codex/skills`, or `.gemini/config/skills`) outside a plugin or repository, excluding tool-owned app folders. `floating-skill check` fails when any exist; `floating-skill list` returns them as data. See agent-engineering ADR 0003.
+_Avoid_: Loose skill, unmanaged skill

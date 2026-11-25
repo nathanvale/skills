@@ -1,0 +1,359 @@
+import { expect, setDefaultTimeout, test } from "bun:test";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { testFolder } from "./support/test-folder.ts";
+
+setDefaultTimeout(30_000);
+
+const cli = join(import.meta.dir, "../src/cli.ts");
+
+function runFloatingSkillCheck(
+  home: string,
+  extraArgs: readonly string[] = [],
+) {
+  const ran = Bun.spawnSync(
+    [
+      process.execPath,
+      "run",
+      cli,
+      "floating-skill",
+      "check",
+      "--home",
+      home,
+      ...extraArgs,
+    ],
+    { stdout: "pipe", stderr: "pipe", timeout: 20_000 },
+  );
+  return {
+    exitCode: ran.exitCode,
+    stdout: ran.stdout.toString(),
+    stderr: ran.stderr.toString(),
+  };
+}
+
+function runFloatingSkillList(home: string, extraArgs: readonly string[] = []) {
+  const ran = Bun.spawnSync(
+    [
+      process.execPath,
+      "run",
+      cli,
+      "floating-skill",
+      "list",
+      "--home",
+      home,
+      ...extraArgs,
+    ],
+    { stdout: "pipe", stderr: "pipe", timeout: 20_000 },
+  );
+  return {
+    exitCode: ran.exitCode,
+    stdout: ran.stdout.toString(),
+    stderr: ran.stderr.toString(),
+  };
+}
+
+function writeSkill(skillDir: string): string {
+  mkdirSync(skillDir, { recursive: true });
+  const skillFile = join(skillDir, "SKILL.md");
+  writeFileSync(skillFile, "---\nname: planted\ndescription: planted\n---\n");
+  return skillFile;
+}
+
+test("floating-skill check and floating-skill list pass on an empty home and report the four checked folders", () => {
+  const home = testFolder("floating-skill-empty-");
+  try {
+    const expectedFolders = [
+      join(home, ".claude/skills"),
+      join(home, ".agents/skills"),
+      join(home, ".codex/skills"),
+      join(home, ".gemini/config/skills"),
+    ];
+
+    const ran = runFloatingSkillCheck(home, ["--json"]);
+    expect({ exitCode: ran.exitCode, stderr: ran.stderr }).toEqual({
+      exitCode: 0,
+      stderr: "",
+    });
+    const parsed: unknown = JSON.parse(ran.stdout);
+    expect(parsed).toMatchObject({
+      result: {
+        commandIdentity: "skills.floating-skill.check",
+        causeCode: "SUCCESS_UNCHANGED",
+        outcome: "success",
+        exitCode: 0,
+        data: {
+          home,
+          checkedFolders: expectedFolders,
+          findings: [],
+        },
+      },
+    });
+
+    const findingsRan = runFloatingSkillList(home, ["--json"]);
+    expect({
+      exitCode: findingsRan.exitCode,
+      stderr: findingsRan.stderr,
+    }).toEqual({
+      exitCode: 0,
+      stderr: "",
+    });
+    const findingsParsed: unknown = JSON.parse(findingsRan.stdout);
+    expect(findingsParsed).toMatchObject({
+      result: {
+        commandIdentity: "skills.floating-skill.list",
+        causeCode: "SUCCESS_UNCHANGED",
+        outcome: "success",
+        exitCode: 0,
+        data: {
+          home,
+          checkedFolders: expectedFolders,
+          findings: [],
+        },
+      },
+    });
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("floating-skill check refuses when a skill is planted under .agents/skills and points next to floating-skill list", () => {
+  const home = testFolder("floating-skill-planted-");
+  try {
+    const planted = writeSkill(join(home, ".agents/skills/planted"));
+    const ran = runFloatingSkillCheck(home, ["--json"]);
+    expect({ exitCode: ran.exitCode, stderr: ran.stderr }).toEqual({
+      exitCode: 3,
+      stderr: "",
+    });
+    const parsed: unknown = JSON.parse(ran.stdout);
+    expect(parsed).toMatchObject({
+      message: `[floating-skill] 1 floating skill(s) found: ${planted}; run \`skills floating-skill list\` for the full list. Repair: move the skill into one of the plugins, or into the repository it serves, or uninstall it. See agent-engineering ADR 0003.`,
+      result: {
+        commandIdentity: "skills.floating-skill.check",
+        causeCode: "DOMAIN_FLOATING_SKILLS",
+        outcome: "refused",
+        exitCode: 3,
+        data: null,
+        next: {
+          kind: "command",
+          command: "skills.floating-skill.list",
+          args: [],
+        },
+      },
+    });
+
+    const plain = runFloatingSkillCheck(home);
+    expect(plain.exitCode).toBe(3);
+    expect(plain.stdout).toBe("");
+    expect(plain.stderr).toContain("[floating-skill]");
+    expect(plain.stderr).toContain(planted);
+    expect(plain.stderr).toContain(
+      "run `skills floating-skill list` for the full list",
+    );
+    expect(plain.stderr).toContain("[DOMAIN_FLOATING_SKILLS]");
+
+    const findingsRan = runFloatingSkillList(home, ["--json"]);
+    expect({
+      exitCode: findingsRan.exitCode,
+      stderr: findingsRan.stderr,
+    }).toEqual({
+      exitCode: 0,
+      stderr: "",
+    });
+    const findingsParsed: unknown = JSON.parse(findingsRan.stdout);
+    expect(findingsParsed).toMatchObject({
+      result: {
+        commandIdentity: "skills.floating-skill.list",
+        causeCode: "SUCCESS_UNCHANGED",
+        outcome: "success",
+        exitCode: 0,
+        data: {
+          home,
+          findings: [
+            {
+              path: planted,
+              symlinkTarget: null,
+            },
+          ],
+        },
+      },
+    });
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("floating-skill check caps its refusal message to the first five paths while floating-skill list returns all of them", () => {
+  const home = testFolder("floating-skill-many-");
+  try {
+    const plantedPaths = [1, 2, 3, 4, 5, 6, 7].map((index) =>
+      writeSkill(join(home, `.agents/skills/skill-${String(index)}`)),
+    );
+
+    const ran = runFloatingSkillCheck(home, ["--json"]);
+    expect({ exitCode: ran.exitCode, stderr: ran.stderr }).toEqual({
+      exitCode: 3,
+      stderr: "",
+    });
+    const parsed: unknown = JSON.parse(ran.stdout);
+    const firstFive = plantedPaths.slice(0, 5).join(", ");
+    expect(parsed).toMatchObject({
+      message: `[floating-skill] 7 floating skill(s) found: ${firstFive}, and 2 more; run \`skills floating-skill list\` for the full list. Repair: move the skill into one of the plugins, or into the repository it serves, or uninstall it. See agent-engineering ADR 0003.`,
+      result: {
+        commandIdentity: "skills.floating-skill.check",
+        causeCode: "DOMAIN_FLOATING_SKILLS",
+        outcome: "refused",
+        exitCode: 3,
+        data: null,
+      },
+    });
+
+    const findingsRan = runFloatingSkillList(home, ["--json"]);
+    expect({
+      exitCode: findingsRan.exitCode,
+      stderr: findingsRan.stderr,
+    }).toEqual({
+      exitCode: 0,
+      stderr: "",
+    });
+    const findingsParsed: unknown = JSON.parse(findingsRan.stdout);
+    expect(findingsParsed).toMatchObject({
+      result: {
+        commandIdentity: "skills.floating-skill.list",
+        causeCode: "SUCCESS_UNCHANGED",
+        outcome: "success",
+        exitCode: 0,
+        data: {
+          home,
+          findings: plantedPaths.map((path) => ({
+            path,
+            symlinkTarget: null,
+          })),
+        },
+      },
+    });
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("floating-skill check and floating-skill list report symlinked skill directories and symlinked SKILL.md files with their targets", () => {
+  const home = testFolder("floating-skill-symlink-");
+  const targetRoot = testFolder("floating-skill-target-");
+  try {
+    const dirTarget = join(targetRoot, "linked-dir-source");
+    writeSkill(dirTarget);
+    mkdirSync(join(home, ".agents/skills"), { recursive: true });
+    symlinkSync(dirTarget, join(home, ".agents/skills/linked-dir"));
+
+    const fileTarget = writeSkill(join(targetRoot, "linked-file-source"));
+    const claudeSkillDir = join(home, ".claude/skills/linked-file");
+    mkdirSync(claudeSkillDir, { recursive: true });
+    symlinkSync(fileTarget, join(claudeSkillDir, "SKILL.md"));
+
+    const ran = runFloatingSkillCheck(home, ["--json"]);
+    expect({ exitCode: ran.exitCode, stderr: ran.stderr }).toEqual({
+      exitCode: 3,
+      stderr: "",
+    });
+    const expectedDirLink = join(home, ".agents/skills/linked-dir/SKILL.md");
+    const expectedFileLink = join(claudeSkillDir, "SKILL.md");
+    const parsed: unknown = JSON.parse(ran.stdout);
+    expect(parsed).toMatchObject({
+      message: `[floating-skill] 2 floating skill(s) found: ${expectedFileLink} -> ${fileTarget}, ${expectedDirLink} -> ${dirTarget}; run \`skills floating-skill list\` for the full list. Repair: move the skill into one of the plugins, or into the repository it serves, or uninstall it. See agent-engineering ADR 0003.`,
+      result: {
+        commandIdentity: "skills.floating-skill.check",
+        causeCode: "DOMAIN_FLOATING_SKILLS",
+        outcome: "refused",
+        exitCode: 3,
+        data: null,
+      },
+    });
+
+    const findingsRan = runFloatingSkillList(home, ["--json"]);
+    expect({
+      exitCode: findingsRan.exitCode,
+      stderr: findingsRan.stderr,
+    }).toEqual({
+      exitCode: 0,
+      stderr: "",
+    });
+    const findingsParsed: unknown = JSON.parse(findingsRan.stdout);
+    expect(findingsParsed).toMatchObject({
+      result: {
+        commandIdentity: "skills.floating-skill.list",
+        causeCode: "SUCCESS_UNCHANGED",
+        outcome: "success",
+        exitCode: 0,
+        data: {
+          home,
+          findings: [
+            {
+              path: expectedFileLink,
+              symlinkTarget: fileTarget,
+            },
+            {
+              path: expectedDirLink,
+              symlinkTarget: dirTarget,
+            },
+          ],
+        },
+      },
+    });
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+    rmSync(targetRoot, { recursive: true, force: true });
+  }
+});
+
+test("floating-skill check ignores the three tool-owned app folders", () => {
+  const home = testFolder("floating-skill-app-folders-");
+  try {
+    writeSkill(join(home, ".codex/skills/.system"));
+    writeSkill(join(home, ".claude/skills/.trash"));
+    writeSkill(join(home, ".claude/skills/synced"));
+
+    const ran = runFloatingSkillCheck(home, ["--json"]);
+    expect({ exitCode: ran.exitCode, stderr: ran.stderr }).toEqual({
+      exitCode: 0,
+      stderr: "",
+    });
+    const parsed: unknown = JSON.parse(ran.stdout);
+    expect(parsed).toMatchObject({
+      result: {
+        commandIdentity: "skills.floating-skill.check",
+        causeCode: "SUCCESS_UNCHANGED",
+        outcome: "success",
+        exitCode: 0,
+        data: {
+          home,
+          findings: [],
+        },
+      },
+    });
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("floating-skill check and floating-skill list skip a symlink that loops to itself and still report the other floating skills", () => {
+  const home = testFolder("floating-skill-loop-");
+  try {
+    const folder = join(home, ".agents", "skills");
+    mkdirSync(join(folder, "planted"), { recursive: true });
+    writeFileSync(
+      join(folder, "planted", "SKILL.md"),
+      "---\nname: planted\ndescription: planted\n---\n",
+    );
+    symlinkSync("aaa-loop", join(folder, "aaa-loop"));
+
+    const checked = runFloatingSkillCheck(home, ["--json"]);
+    expect(checked.exitCode).toBe(3);
+
+    const listed = runFloatingSkillList(home, ["--json"]);
+    expect(listed.exitCode).toBe(0);
+    expect(listed.stdout).toContain(join(folder, "planted", "SKILL.md"));
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
