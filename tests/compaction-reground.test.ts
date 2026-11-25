@@ -73,7 +73,7 @@ function handWrittenNamedRegroundTextOracle(
   return `Coordinator reground: your context was just compacted. This session is registered as a coordinator (${folder}).
 
 Do no merge, push, post or other gated act until all four steps are done:
-1. Reread the standing orders and the working instructions in ${stateFolder} in full.
+1. Reread STANDING-ORDERS.md and WORKING-INSTRUCTIONS.md in ${stateFolder} in full, and state the map's version you read. Before any merge ruling or merge, read rules/merging.md.
 2. Reread your own unit state in ${stateFolder}/${folder}/ and the last rows of its decisions.tsv.
 3. Confirm each unit against GitHub and git. The summary above is a note, not proof.
 4. Send the Super Coordinator one message with your rules version and each unit's state.
@@ -86,7 +86,7 @@ function handWrittenSuperCoordinatorRegroundTextOracle(
   return `Coordinator reground: your context was just compacted. This session is registered as a coordinator (super-coordinator).
 
 Do no merge, push, post or other gated act until all four steps are done:
-1. Reread the standing orders and the working instructions in ${stateFolder} in full.
+1. Reread STANDING-ORDERS.md and WORKING-INSTRUCTIONS.md in ${stateFolder} in full, and state the map's version you read. Before any merge ruling or merge, read rules/merging.md.
 2. Reread your own unit state in ${stateFolder}/super-coordinator/ and the last rows of its decisions.tsv.
 3. Confirm each unit against GitHub and git. The summary above is a note, not proof.
 4. Write your rules version and each unit's state in STATE.md.
@@ -97,7 +97,7 @@ function handWrittenGenericRegroundTextOracle(stateFolder: string): string {
   return `Coordinator reground: your context was just compacted. This session is registered as a coordinator.
 
 Do no merge, push, post or other gated act until all four steps are done:
-1. Reread the standing orders and the working instructions in ${stateFolder} in full.
+1. Reread STANDING-ORDERS.md and WORKING-INSTRUCTIONS.md in ${stateFolder} in full, and state the map's version you read. Before any merge ruling or merge, read rules/merging.md.
 2. Reread your own unit state in your coordinator folder under ${stateFolder}/ and the last rows of its decisions.tsv.
 3. Confirm each unit against GitHub and git. The summary above is a note, not proof.
 4. Send the Super Coordinator one message with your rules version and each unit's state.

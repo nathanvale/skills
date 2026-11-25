@@ -64,7 +64,7 @@ function namedOracle(stateDir: string, folder: string): string {
     `Coordinator reground: your context was just compacted. This session is registered as a coordinator (${folder}).`,
     "",
     "Do no merge, push, post or other gated act until all four steps are done:",
-    `1. Reread the standing orders and the working instructions in ${stateDir} in full.`,
+    `1. Reread STANDING-ORDERS.md and WORKING-INSTRUCTIONS.md in ${stateDir} in full, and state the map's version you read. Before any merge ruling or merge, read rules/merging.md.`,
     `2. Reread your own unit state in ${stateDir}/${folder}/ and the last rows of its decisions.tsv.`,
     "3. Confirm each unit against GitHub and git. The summary above is a note, not proof.",
     step4,
