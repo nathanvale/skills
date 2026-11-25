@@ -170,7 +170,22 @@ function codexRefusesImplicitInvocation(document: unknown): boolean {
   );
 }
 
-function invocationMarkerIssue(root: string, entry: SkillEntry): string | null {
+function invocationMarkerIssue(
+  root: string,
+  entry: SkillEntry,
+  frontmatter: object,
+): string | null {
+  if (
+    Object.hasOwn(frontmatter, "disable-model-invocation") &&
+    Reflect.get(frontmatter, "disable-model-invocation") !== true
+  ) {
+    return formatRuleIssue(
+      "typed-drift",
+      entry.skillPath,
+      "disable-model-invocation must be the YAML boolean true",
+      "write disable-model-invocation: true, or remove the key for an automatic skill",
+    );
+  }
   const policyPath = join(root, entry.skillPath, "agents", "openai.yaml");
   const codexDisabled = codexRefusesImplicitInvocation(
     readYamlOrNull(policyPath),
@@ -254,7 +269,7 @@ function validateSkillFiles(
         `${entry.skillPath}/SKILL.md: frontmatter must start with a field on the line after the opening "---". Repair: delete the blank line after "---".`,
       );
     }
-    const markerIssue = invocationMarkerIssue(root, entry);
+    const markerIssue = invocationMarkerIssue(root, entry, fields);
     if (markerIssue !== null) issues.push(markerIssue);
     const declaredName = readFrontmatterString(fields, "name") ?? "";
     const description = readFrontmatterString(fields, "description") ?? "";

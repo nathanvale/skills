@@ -86,6 +86,85 @@ test("validate reads disable-model-invocation from parsed YAML frontmatter, igno
   });
 });
 
+test("validate refuses non-boolean-true disable-model-invocation values and accepts plain true", () => {
+  withCatalogCopy("skills-typed-only-values-", (copy) => {
+    const skillDir = join(copy, "skills/in-progress/marker-probe");
+    const skillFile = join(skillDir, "SKILL.md");
+    const policyDir = join(skillDir, "agents");
+    const policyFile = join(policyDir, "openai.yaml");
+    mkdirSync(skillDir, { recursive: true });
+
+    const refusal =
+      "[typed-drift] skills/in-progress/marker-probe: disable-model-invocation must be the YAML boolean true. Repair: write disable-model-invocation: true, or remove the key for an automatic skill. See agent-engineering ADR 0003.";
+
+    const invalidMarkers: Readonly<Record<string, string>> = {
+      'double-quoted "true"': 'disable-model-invocation: "true"',
+      "single-quoted 'true'": "disable-model-invocation: 'true'",
+      "string yes": "disable-model-invocation: yes",
+      "number 1": "disable-model-invocation: 1",
+      "boolean false": "disable-model-invocation: false",
+      "empty value": "disable-model-invocation:",
+    };
+
+    const outcomes: Record<string, readonly string[]> = {};
+    for (const [label, line] of Object.entries(invalidMarkers)) {
+      writeFileSync(
+        skillFile,
+        [
+          "---",
+          "name: marker-probe",
+          "description: Probe skill",
+          line,
+          "---",
+          "",
+        ].join("\n"),
+      );
+      outcomes[label] = validateSkillsRepository(copy).issues;
+    }
+
+    mkdirSync(policyDir, { recursive: true });
+    writeFileSync(policyFile, "policy:\n  allow_implicit_invocation: false\n");
+    writeFileSync(
+      skillFile,
+      [
+        "---",
+        "name: marker-probe",
+        "description: Probe skill",
+        'disable-model-invocation: "true"',
+        "---",
+        "",
+      ].join("\n"),
+    );
+    outcomes['quoted "true" with Codex policy'] =
+      validateSkillsRepository(copy).issues;
+
+    writeFileSync(
+      skillFile,
+      [
+        "---",
+        "name: marker-probe",
+        "description: Probe skill",
+        "disable-model-invocation: true",
+        "---",
+        "",
+      ].join("\n"),
+    );
+    outcomes["plain boolean true with Codex policy"] =
+      validateSkillsRepository(copy).issues;
+
+    expect(outcomes).toEqual({
+      'double-quoted "true"': [refusal],
+      "single-quoted 'true'": [refusal],
+      "string yes": [refusal],
+      "number 1": [refusal],
+      "boolean false": [refusal],
+      "empty value": [refusal],
+      'quoted "true" with Codex policy': [refusal],
+      "plain boolean true with Codex policy": [],
+    });
+  });
+});
+
 function readJsonObject(path: string): Record<string, unknown> {
   const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
