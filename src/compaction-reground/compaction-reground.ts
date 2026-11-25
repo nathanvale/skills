@@ -11,12 +11,17 @@ import {
   writeSync,
 } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
+import {
+  readRootedFile,
+  type RootedFileResult,
+} from "agent-cli-kernel/rooted-file";
+import { xdgBaseFolder } from "agent-cli-kernel/xdg-base";
 
 const STATE_FOLDER_SEGMENTS = ["my-agent-dojo", "agent-coordination"];
 const CONTROL_CHARACTER_PATTERN = /\p{Cc}/u;
 const ROSTER_FOLDER_NAME = "coordinator-roster";
 const CURSOR_FOLDER_NAME = "compaction-cursors";
-const ROSTER_HEAD_BYTES = 256;
+const ROSTER_BYTE_LIMIT = 1024;
 const CURSOR_HEAD_BYTES = 512;
 const TRANSCRIPT_CHUNK_BYTES = 256 * 1024;
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
@@ -39,6 +44,8 @@ interface AntigravityRequest {
   conversationId: string;
   transcriptPath: string;
 }
+
+type RosterEntry = { folder: string | null };
 
 const EMPTY_CURSOR: CompactionCursor = {
   lastCheckpointStep: -1,
@@ -81,15 +88,8 @@ function stateFolder(): string | null {
   if (chosen) {
     return isUsableStateFolder(chosen) ? resolve(chosen) : null;
   }
-  const xdgStateHome = process.env.XDG_STATE_HOME;
-  if (xdgStateHome && isAbsolute(xdgStateHome)) {
-    return join(xdgStateHome, ...STATE_FOLDER_SEGMENTS);
-  }
-  const home = process.env.HOME;
-  if (home && isAbsolute(home)) {
-    return join(home, ".local", "state", ...STATE_FOLDER_SEGMENTS);
-  }
-  return null;
+  const base = xdgBaseFolder(process.env, "state");
+  return base === undefined ? null : join(base, ...STATE_FOLDER_SEGMENTS);
 }
 
 function asJsonObject(value: unknown): object | null {
@@ -107,33 +107,12 @@ function regularFileSize(path: string): number | null {
   }
 }
 
-function isUsableEntry(path: string, kind: "directory" | "file"): boolean {
-  try {
-    const info = lstatSync(path);
-    return kind === "directory" ? info.isDirectory() : info.isFile();
-  } catch (error: unknown) {
-    const obj = asJsonObject(error);
-    return obj !== null && Reflect.get(obj, "code") === "ENOENT";
-  }
-}
-
 function safeIntegerAtLeast(value: unknown, minimum: number): number | null {
   return typeof value === "number" &&
     Number.isSafeInteger(value) &&
     value >= minimum
     ? value
     : null;
-}
-
-function readSlice(path: string, offset: number, length: number): Buffer {
-  const descriptor = openSync(path, "r");
-  try {
-    const buffer = Buffer.alloc(length);
-    const bytesRead = readSync(descriptor, buffer, 0, length, offset);
-    return buffer.subarray(0, bytesRead);
-  } finally {
-    closeSync(descriptor);
-  }
 }
 
 function sha256Prefix(path: string, byteCount: number): string | null {
@@ -160,10 +139,28 @@ function sha256Prefix(path: string, byteCount: number): string | null {
   return totalRead === byteCount ? hasher.digest("hex") : null;
 }
 
-function coordinatorFolder(path: string): string | null {
-  const head = readSlice(path, 0, ROSTER_HEAD_BYTES).toString("utf8");
+function readRootedOrNull(
+  state: string,
+  relativePath: string,
+  limitBytes: number,
+): RootedFileResult | null {
+  try {
+    return readRootedFile(state, relativePath, limitBytes);
+  } catch {
+    return null;
+  }
+}
+
+function readRosterEntry(state: string, sessionId: string): RosterEntry | null {
+  const result = readRootedOrNull(
+    state,
+    join(ROSTER_FOLDER_NAME, sessionId),
+    ROSTER_BYTE_LIMIT,
+  );
+  if (result?.kind !== "read") return null;
+  const head = Buffer.from(result.bytes).toString("utf8");
   const first = (head.split("\n")[0] ?? "").trim();
-  return COORDINATOR_FOLDER_PATTERN.test(first) ? first : null;
+  return { folder: COORDINATOR_FOLDER_PATTERN.test(first) ? first : null };
 }
 
 function hasSubagentMarker(input: object): boolean {
@@ -214,32 +211,46 @@ function validPrefixSha256(value: unknown, bytes: number): string {
     : "";
 }
 
-function readCursor(path: string): CompactionCursor {
-  if (regularFileSize(path) === null) return EMPTY_CURSOR;
+function parseCursorBytes(bytes: Uint8Array): CompactionCursor {
   try {
-    const raw = readSlice(path, 0, CURSOR_HEAD_BYTES).toString("utf8");
+    const raw = Buffer.from(bytes).toString("utf8");
     const parsed = asJsonObject(JSON.parse(raw));
     if (parsed === null) return EMPTY_CURSOR;
     const step = safeIntegerAtLeast(
       Reflect.get(parsed, "lastCheckpointStep"),
       -1,
     );
-    const bytes = safeIntegerAtLeast(
+    const scanned = safeIntegerAtLeast(
       Reflect.get(parsed, "lastScannedBytes"),
       0,
     );
-    if (step === null || bytes === null) return EMPTY_CURSOR;
+    if (step === null || scanned === null) return EMPTY_CURSOR;
     return {
       lastCheckpointStep: step,
-      lastScannedBytes: bytes,
+      lastScannedBytes: scanned,
       prefixSha256: validPrefixSha256(
         Reflect.get(parsed, "prefixSha256"),
-        bytes,
+        scanned,
       ),
     };
   } catch {
     return EMPTY_CURSOR;
   }
+}
+
+function readCursor(
+  state: string,
+  conversationId: string,
+): CompactionCursor | null {
+  const result = readRootedOrNull(
+    state,
+    join(CURSOR_FOLDER_NAME, conversationId),
+    CURSOR_HEAD_BYTES,
+  );
+  if (result === null || result.kind === "refused") return null;
+  return result.kind === "missing"
+    ? EMPTY_CURSOR
+    : parseCursorBytes(result.bytes);
 }
 
 function cleanupStaging(staging: string): void {
@@ -385,22 +396,13 @@ function cursorsEqual(a: CompactionCursor, b: CompactionCursor): boolean {
 
 function antigravityOutput(state: string, request: AntigravityRequest): string {
   const { conversationId, transcriptPath } = request;
-  const entry = join(state, ROSTER_FOLDER_NAME, conversationId);
-  if (regularFileSize(entry) === null) {
-    return ANTIGRAVITY_EMPTY_OUTPUT;
-  }
+  const roster = readRosterEntry(state, conversationId);
+  if (roster === null) return ANTIGRAVITY_EMPTY_OUTPUT;
   const fileSize = regularFileSize(transcriptPath);
-  const cursorFolder = join(state, CURSOR_FOLDER_NAME);
-  const cursorPath = join(cursorFolder, conversationId);
-  if (
-    fileSize === null ||
-    !isUsableEntry(cursorFolder, "directory") ||
-    !isUsableEntry(cursorPath, "file")
-  ) {
-    return ANTIGRAVITY_EMPTY_OUTPUT;
-  }
+  if (fileSize === null) return ANTIGRAVITY_EMPTY_OUTPUT;
+  const cursor = readCursor(state, conversationId);
+  if (cursor === null) return ANTIGRAVITY_EMPTY_OUTPUT;
 
-  const cursor = readCursor(cursorPath);
   const rewound = isTranscriptRewound(transcriptPath, fileSize, cursor);
   if (!rewound && fileSize === cursor.lastScannedBytes) {
     return ANTIGRAVITY_EMPTY_OUTPUT;
@@ -415,9 +417,7 @@ function antigravityOutput(state: string, request: AntigravityRequest): string {
 
   const shouldFire =
     !rewound && scan.maxCheckpointStep > cursor.lastCheckpointStep;
-  const systemMessage = shouldFire
-    ? regroundText(state, coordinatorFolder(entry))
-    : null;
+  const systemMessage = shouldFire ? regroundText(state, roster.folder) : null;
   const nextCursor: CompactionCursor = {
     lastCheckpointStep:
       rewound || shouldFire
@@ -426,6 +426,7 @@ function antigravityOutput(state: string, request: AntigravityRequest): string {
     lastScannedBytes: scan.consumedBytes,
     prefixSha256: nextPrefixSha256,
   };
+  const cursorFolder = join(state, CURSOR_FOLDER_NAME);
   if (
     !cursorsEqual(cursor, nextCursor) &&
     !writeCursor(cursorFolder, conversationId, nextCursor)
@@ -440,11 +441,11 @@ function antigravityOutput(state: string, request: AntigravityRequest): string {
 }
 
 function claudeOutput(state: string, sessionId: string): string | null {
-  const entry = join(state, ROSTER_FOLDER_NAME, sessionId);
-  if (regularFileSize(entry) === null) {
+  const roster = readRosterEntry(state, sessionId);
+  if (roster === null) {
     return null;
   }
-  const additionalContext = regroundText(state, coordinatorFolder(entry));
+  const additionalContext = regroundText(state, roster.folder);
   return JSON.stringify({
     hookSpecificOutput: { hookEventName: "SessionStart", additionalContext },
   });

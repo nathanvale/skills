@@ -58,6 +58,7 @@ export default tseslint.config(
     ignores: [
       "node_modules/**",
       "dist/**",
+      "hooks/**/dist/**",
       "skills/**/dist/**",
       "coverage/**",
       ".fallow/**",

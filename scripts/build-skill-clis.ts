@@ -11,10 +11,10 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export type SkillCliSpec = {
-  readonly kind?: "contract" | "runtime-factory";
+  readonly kind?: "contract" | "runtime-factory" | "script";
   readonly name: string;
   readonly sourceModule: string;
-  readonly exportName: string;
+  readonly exportName?: string;
   readonly outputFile: string;
 };
 
@@ -31,6 +31,12 @@ export const SKILL_CLIS: readonly SkillCliSpec[] = [
     sourceModule: "src/google-contacts/cli.ts",
     exportName: "createGoogleContactsCli",
     outputFile: "skills/in-progress/google-contacts/dist/cli.mjs",
+  },
+  {
+    kind: "script",
+    name: "compaction-reground",
+    sourceModule: "src/compaction-reground/compaction-reground.ts",
+    outputFile: "hooks/coordinator/dist/compaction-reground.mjs",
   },
 ];
 
@@ -49,29 +55,37 @@ export async function renderSkillCliBundle(
 ): Promise<string> {
   const scratch = mkdtempSync(join(tmpdir(), "skills-cli-build-"));
   try {
-    const kernelEntry = fileURLToPath(import.meta.resolve("agent-cli-kernel"))
-      .split("\\")
-      .join("/");
     const sourcePath = resolve(root, spec.sourceModule).split("\\").join("/");
-    const entryPath = join(scratch, "entry.ts");
-    const entrySource =
-      spec.kind === "runtime-factory"
-        ? [
-            `import { runProcess } from ${JSON.stringify(kernelEntry)};`,
-            `import { ${spec.exportName} } from ${JSON.stringify(sourcePath)};`,
-            `const runtime = ${spec.exportName}();`,
-            "await runProcess(runtime.contract, runtime.setup)(process.argv.slice(2));",
-            "",
-          ].join("\n")
-        : [
-            `import { runProcess } from ${JSON.stringify(kernelEntry)};`,
-            `import { ${spec.exportName} } from ${JSON.stringify(sourcePath)};`,
-            `await runProcess(${spec.exportName})(process.argv.slice(2));`,
-            "",
-          ].join("\n");
-    writeFileSync(entryPath, entrySource, "utf8");
+    let entrypoint = sourcePath;
+    if (spec.kind !== "script") {
+      const kernelEntry = fileURLToPath(import.meta.resolve("agent-cli-kernel"))
+        .split("\\")
+        .join("/");
+      const exportName = spec.exportName;
+      if (exportName === undefined) {
+        throw new Error(`Missing exportName for ${spec.name}`);
+      }
+      const entryPath = join(scratch, "entry.ts");
+      const entrySource =
+        spec.kind === "runtime-factory"
+          ? [
+              `import { runProcess } from ${JSON.stringify(kernelEntry)};`,
+              `import { ${exportName} } from ${JSON.stringify(sourcePath)};`,
+              `const runtime = ${exportName}();`,
+              "await runProcess(runtime.contract, runtime.setup)(process.argv.slice(2));",
+              "",
+            ].join("\n")
+          : [
+              `import { runProcess } from ${JSON.stringify(kernelEntry)};`,
+              `import { ${exportName} } from ${JSON.stringify(sourcePath)};`,
+              `await runProcess(${exportName})(process.argv.slice(2));`,
+              "",
+            ].join("\n");
+      writeFileSync(entryPath, entrySource, "utf8");
+      entrypoint = entryPath;
+    }
     const built = await Bun.build({
-      entrypoints: [entryPath],
+      entrypoints: [entrypoint],
       target: "bun",
       format: "esm",
       minify: true,

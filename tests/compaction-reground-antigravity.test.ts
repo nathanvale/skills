@@ -170,12 +170,8 @@ function copyPluginReadOnly(): string {
   const files = [
     "hooks.json",
     join("hooks", "coordinator", "compaction-reground.sh"),
+    join("hooks", "coordinator", "dist", "compaction-reground.mjs"),
   ];
-  for (const name of readdirSync(
-    join(repoRoot, "src", "compaction-reground"),
-  )) {
-    files.push(join("src", "compaction-reground", name));
-  }
   for (const rel of files) {
     const target = join(dest, rel);
     mkdirSync(dirname(target), { recursive: true });

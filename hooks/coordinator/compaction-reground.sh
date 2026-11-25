@@ -58,9 +58,9 @@ CDPATH= cd -- "$script_dir" >/dev/null 2>&1 || finish_silent
 bun_executable=$(command -v bun 2>/dev/null) || finish_silent
 
 if [ "$antigravity_mode" -eq 1 ]; then
-  reground=$("$bun_executable" --no-env-file ../../src/compaction-reground/compaction-reground.ts --antigravity 2>/dev/null) || finish_silent
+  reground=$("$bun_executable" --no-env-file ./dist/compaction-reground.mjs --antigravity 2>/dev/null) || finish_silent
 else
-  reground=$("$bun_executable" --no-env-file ../../src/compaction-reground/compaction-reground.ts 2>/dev/null) || finish_silent
+  reground=$("$bun_executable" --no-env-file ./dist/compaction-reground.mjs 2>/dev/null) || finish_silent
 fi
 
 [ -n "$reground" ] || finish_silent
