@@ -183,31 +183,35 @@ const validate = command({
   },
 });
 
+const DOCTOR_PREVIEW_LIMIT = 5;
+
+const doctorInput = {
+  ...noInput,
+  options: [
+    {
+      name: "--home",
+      aliases: [],
+      summary:
+        "Home directory to scan (defaults to the current user's home directory).",
+      required: false,
+      repeatable: false,
+      value: {
+        kind: "string",
+        minLength: 1,
+        maxLength: 4096,
+        choices: null,
+        pattern: null,
+      },
+    },
+  ],
+} as const;
+
 const doctor = command({
   identity: "skills.doctor",
   route: ["doctor"],
   summary:
-    "Check user-level skill folders for floating skills (agent-engineering ADR 0003).",
-  input: {
-    ...noInput,
-    options: [
-      {
-        name: "--home",
-        aliases: [],
-        summary:
-          "Home directory to scan (defaults to the current user's home directory).",
-        required: false,
-        repeatable: false,
-        value: {
-          kind: "string",
-          minLength: 1,
-          maxLength: 4096,
-          choices: null,
-          pattern: null,
-        },
-      },
-    ],
-  },
+    "Check user-level skill folders for floating skills (agent-engineering ADR 0003); run doctor findings for the full list.",
+  input: doctorInput,
   capabilities: {},
   stations: [
     station(causes, {
@@ -229,11 +233,12 @@ const doctor = command({
         "One or more SKILL.md files sit in a scanned user-level skill folder outside a plugin or repository.",
       guidance: {
         next: {
-          kind: "instruction",
-          text: `Repair: ${FLOATING_SKILL_REPAIR}`,
+          kind: "command",
+          command: "skills.doctor.findings",
+          args: [],
         },
       },
-      repairAction: `Repair: ${FLOATING_SKILL_REPAIR}`,
+      repairAction: `Run \`skills doctor findings\` for the full list, then ${FLOATING_SKILL_REPAIR}`,
       independentObservable:
         "At least one SKILL.md was found in a scanned user-level skill folder.",
     }),
@@ -241,20 +246,23 @@ const doctor = command({
   run: (input, context) => {
     const report = inspectUserSkillFolders(input["--home"]);
     if (report.findings.length > 0) {
-      const listed = report.findings
+      const preview = report.findings
+        .slice(0, DOCTOR_PREVIEW_LIMIT)
         .map((finding) =>
           finding.symlinkTarget === null
             ? finding.path
             : `${finding.path} -> ${finding.symlinkTarget}`,
         )
         .join(", ");
+      const remaining = report.findings.length - DOCTOR_PREVIEW_LIMIT;
+      const more = remaining > 0 ? `, and ${String(remaining)} more` : "";
       return context.result(
         {
           commandIdentity: "skills.doctor",
           causeCode: "DOMAIN_FLOATING_SKILLS",
         },
         {
-          message: `[floating-skill] ${String(report.findings.length)} floating skill(s) found: ${listed}. Repair: ${FLOATING_SKILL_REPAIR}`,
+          message: `[floating-skill] ${String(report.findings.length)} floating skill(s) found: ${preview}${more}; run \`skills doctor findings\` for the full list. Repair: ${FLOATING_SKILL_REPAIR}`,
           data: null,
           effects: noEffects,
         },
@@ -274,6 +282,33 @@ const doctor = command({
   },
 });
 
+const doctorFindings = command({
+  identity: "skills.doctor.findings",
+  route: ["doctor", "findings"],
+  summary:
+    "Return the full floating-skill report for user-level skill folders as typed data.",
+  input: doctorInput,
+  capabilities: {},
+  run: (input, context) => {
+    const report = inspectUserSkillFolders(input["--home"]);
+    const message =
+      report.findings.length === 0
+        ? `No floating skills found across ${String(report.checkedFolders.length)} user-level folders.`
+        : `${String(report.findings.length)} floating skill(s) found across ${String(report.checkedFolders.length)} user-level folders.`;
+    return context.result(
+      {
+        commandIdentity: "skills.doctor.findings",
+        causeCode: succeeded,
+      },
+      {
+        message,
+        data: report,
+        effects: noEffects,
+      },
+    );
+  },
+});
+
 export const skillCauses = causes;
 
 export const commands = [
@@ -281,5 +316,6 @@ export const commands = [
   list,
   validate,
   doctor,
+  doctorFindings,
   helloWorldCommand,
 ] as const;
