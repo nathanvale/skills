@@ -53,56 +53,143 @@ function compareCodeUnit(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-function unquoteYamlScalar(raw: string): string {
-  const trimmed = raw.trim();
-  if (
-    trimmed.length >= 2 &&
-    ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-      (trimmed.startsWith("'") && trimmed.endsWith("'")))
-  ) {
-    return trimmed.slice(1, -1);
-  }
-  return trimmed;
+function asYamlMapping(value: unknown): object | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value
+    : null;
 }
 
-function parseFrontmatter(
-  markdown: string,
-): ReadonlyMap<string, string> | null {
+function parseFrontmatter(markdown: string): object | null {
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(markdown);
   if (match === null) return null;
   const block = match[1] ?? "";
-  const fields = new Map<string, string>();
-  for (const rawLine of block.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (line.length === 0 || line.startsWith("#")) continue;
-    const colon = line.indexOf(":");
-    if (colon <= 0) continue;
-    const key = line.slice(0, colon).trim();
-    const value = unquoteYamlScalar(line.slice(colon + 1));
-    fields.set(key, value);
+  try {
+    return asYamlMapping(YAML.parse(block));
+  } catch {
+    return null;
   }
-  return fields;
 }
 
-function readManifestSkills(manifestPath: string): {
+function readFrontmatterString(
+  frontmatter: object | null,
+  key: string,
+): string | null {
+  if (frontmatter === null || !Object.hasOwn(frontmatter, key)) return null;
+  const value: unknown = Reflect.get(frontmatter, key);
+  return typeof value === "string" ? value : null;
+}
+
+function isModelInvocationDisabled(frontmatter: object | null): boolean {
+  return (
+    frontmatter !== null &&
+    Object.hasOwn(frontmatter, "disable-model-invocation") &&
+    Reflect.get(frontmatter, "disable-model-invocation") === true
+  );
+}
+
+const ADR_0003_POINTER = "See agent-engineering ADR 0003.";
+
+type CatalogRule =
+  | "typed-drift"
+  | "auto-drift"
+  | "stray-skill"
+  | "missing-manifest"
+  | "invalid-manifest"
+  | "manifest-drift";
+
+function formatRuleIssue(
+  rule: CatalogRule,
+  subject: string,
+  detail: string,
+  repair: string,
+): string {
+  return `[${rule}] ${subject}: ${detail}. Repair: ${repair}. ${ADR_0003_POINTER}`;
+}
+
+type JsonReadResult =
+  | { readonly ok: true; readonly value: unknown }
+  | { readonly ok: false; readonly reason: "read" | "parse" };
+
+function parseJsonFile(path: string): JsonReadResult {
+  let raw: string;
+  try {
+    raw = readFileSync(path, "utf8");
+  } catch {
+    return { ok: false, reason: "read" };
+  }
+  try {
+    return { ok: true, value: JSON.parse(raw) };
+  } catch {
+    return { ok: false, reason: "parse" };
+  }
+}
+
+function readManifestSkills(
+  manifestPath: string,
+  rel: string,
+): {
   readonly skills: readonly string[] | null;
   readonly issue: string | null;
 } {
-  if (!existsSync(manifestPath)) {
-    return { skills: null, issue: `Missing plugin manifest: ${manifestPath}` };
+  const parsed = parseJsonFile(manifestPath);
+  if (!parsed.ok) {
+    if (parsed.reason === "read") {
+      return {
+        skills: null,
+        issue: formatRuleIssue(
+          "missing-manifest",
+          rel,
+          "missing or unreadable plugin manifest",
+          `ensure ${rel} is present and readable with a "skills" array listing every promoted skill`,
+        ),
+      };
+    }
+    return {
+      skills: null,
+      issue: formatRuleIssue(
+        "invalid-manifest",
+        rel,
+        "invalid JSON",
+        `fix the JSON syntax in ${rel}`,
+      ),
+    };
   }
-  const parsed: unknown = JSON.parse(readFileSync(manifestPath, "utf8"));
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    return { skills: null, issue: `${manifestPath}: expected JSON object` };
+  if (
+    typeof parsed.value !== "object" ||
+    parsed.value === null ||
+    Array.isArray(parsed.value)
+  ) {
+    return {
+      skills: null,
+      issue: formatRuleIssue(
+        "invalid-manifest",
+        rel,
+        "expected JSON object",
+        `write a JSON object with a "skills" array in ${rel}`,
+      ),
+    };
   }
-  if (!Object.hasOwn(parsed, "skills")) {
-    return { skills: null, issue: `${manifestPath}: missing "skills" array` };
+  if (!Object.hasOwn(parsed.value, "skills")) {
+    return {
+      skills: null,
+      issue: formatRuleIssue(
+        "invalid-manifest",
+        rel,
+        'missing "skills" array',
+        `add a "skills" array listing every promoted skill to ${rel}`,
+      ),
+    };
   }
-  const rawSkills: unknown = Reflect.get(parsed, "skills");
+  const rawSkills: unknown = Reflect.get(parsed.value, "skills");
   if (!Array.isArray(rawSkills)) {
     return {
       skills: null,
-      issue: `${manifestPath}: "skills" must be an array`,
+      issue: formatRuleIssue(
+        "invalid-manifest",
+        rel,
+        '"skills" must be an array',
+        `set "skills" to an array of skill paths in ${rel}`,
+      ),
     };
   }
   const items: string[] = [];
@@ -110,7 +197,12 @@ function readManifestSkills(manifestPath: string): {
     if (typeof item !== "string") {
       return {
         skills: null,
-        issue: `${manifestPath}: every "skills" entry must be a string`,
+        issue: formatRuleIssue(
+          "invalid-manifest",
+          rel,
+          'every "skills" entry must be a string',
+          `list each skill path as a string in ${rel}`,
+        ),
       };
     }
     items.push(item);
@@ -145,9 +237,9 @@ export function discoverSkills(root = MODULE_ROOT): readonly SkillEntry[] {
       const skillFile = join(skillFolder, "SKILL.md");
       if (!existsSync(skillFile)) continue;
       const fields = parseFrontmatter(readFileSync(skillFile, "utf8"));
-      const name = fields?.get("name") ?? skillDir;
-      const description = fields?.get("description") ?? "";
-      const disabled = fields?.get("disable-model-invocation") === "true";
+      const name = readFrontmatterString(fields, "name") ?? skillDir;
+      const description = readFrontmatterString(fields, "description") ?? "";
+      const disabled = isModelInvocationDisabled(fields);
       const cliBundle = join(skillFolder, "dist", "cli.mjs");
       entries.push({
         name,
@@ -166,12 +258,6 @@ export function discoverSkills(root = MODULE_ROOT): readonly SkillEntry[] {
 }
 
 const FRONTMATTER_OPENS_WITH_A_FIELD = /^---\r?\n[A-Za-z]/;
-
-function asYamlMapping(value: unknown): object | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value
-    : null;
-}
 
 function readYamlOrNull(path: string): unknown {
   try {
@@ -194,11 +280,70 @@ function codexRefusesImplicitInvocation(document: unknown): boolean {
   );
 }
 
-function codexPolicyIssue(root: string, entry: SkillEntry): string | null {
-  if (entry.invocation !== "user-invoked") return null;
+function invocationMarkerIssue(root: string, entry: SkillEntry): string | null {
   const policyPath = join(root, entry.skillPath, "agents", "openai.yaml");
-  if (codexRefusesImplicitInvocation(readYamlOrNull(policyPath))) return null;
-  return `${entry.skillPath}: disable-model-invocation is true but Codex ignores it. Repair: add agents/openai.yaml with "policy:" and "  allow_implicit_invocation: false".`;
+  const codexDisabled = codexRefusesImplicitInvocation(
+    readYamlOrNull(policyPath),
+  );
+  if (entry.invocation === "user-invoked" && !codexDisabled) {
+    return formatRuleIssue(
+      "typed-drift",
+      entry.skillPath,
+      "disable-model-invocation is true but Codex ignores it",
+      'add agents/openai.yaml with "policy:" and "  allow_implicit_invocation: false"',
+    );
+  }
+  if (entry.invocation === "model-invoked" && codexDisabled) {
+    return formatRuleIssue(
+      "auto-drift",
+      entry.skillPath,
+      "agents/openai.yaml sets allow_implicit_invocation: false but SKILL.md lacks disable-model-invocation: true",
+      'add "disable-model-invocation: true" to SKILL.md front matter, or remove the policy if the skill should load automatically',
+    );
+  }
+  return null;
+}
+
+function collectSkillFiles(dir: string, files: string[]): void {
+  const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
+    compareCodeUnit(a.name, b.name),
+  );
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      collectSkillFiles(fullPath, files);
+    } else if (entry.isFile() && entry.name === "SKILL.md") {
+      files.push(fullPath);
+    }
+  }
+}
+
+function isKnownBucketSkillFile(relFromSkills: string): boolean {
+  const parts = relFromSkills.split("/");
+  const bucket = parts[0] ?? "";
+  return parts.length === 3 && KNOWN_BUCKETS.has(bucket);
+}
+
+function validateStraySkills(root: string): string[] {
+  const skillsDir = join(root, "skills");
+  if (!existsSync(skillsDir)) return [];
+  const found: string[] = [];
+  collectSkillFiles(skillsDir, found);
+  const issues: string[] = [];
+  for (const filePath of found) {
+    const relFromSkills = relative(skillsDir, filePath).split("\\").join("/");
+    if (isKnownBucketSkillFile(relFromSkills)) continue;
+    const rel = relative(root, filePath).split("\\").join("/");
+    issues.push(
+      formatRuleIssue(
+        "stray-skill",
+        rel,
+        "SKILL.md is outside a known bucket folder (skills/<bucket>/<skill>/SKILL.md)",
+        "move it into a bucket, or delete it",
+      ),
+    );
+  }
+  return issues;
 }
 
 function validateSkillFiles(
@@ -219,10 +364,10 @@ function validateSkillFiles(
         `${entry.skillPath}/SKILL.md: frontmatter must start with a field on the line after the opening "---". Repair: delete the blank line after "---".`,
       );
     }
-    const policyIssue = codexPolicyIssue(root, entry);
-    if (policyIssue !== null) issues.push(policyIssue);
-    const declaredName = fields.get("name") ?? "";
-    const description = fields.get("description") ?? "";
+    const markerIssue = invocationMarkerIssue(root, entry);
+    if (markerIssue !== null) issues.push(markerIssue);
+    const declaredName = readFrontmatterString(fields, "name") ?? "";
+    const description = readFrontmatterString(fields, "description") ?? "";
     if (declaredName.trim().length === 0) {
       issues.push(`${entry.skillPath}/SKILL.md: missing frontmatter "name"`);
     }
@@ -246,7 +391,7 @@ function validateManifestSync(
   ];
   for (const manifestPath of manifestPaths) {
     const rel = relative(root, manifestPath).split("\\").join("/");
-    const result = readManifestSkills(manifestPath);
+    const result = readManifestSkills(manifestPath, rel);
     if (result.issue !== null) {
       issues.push(result.issue);
       continue;
@@ -254,12 +399,26 @@ function validateManifestSync(
     const actual = [...(result.skills ?? [])].sort(compareCodeUnit);
     for (const expected of expectedPromoted) {
       if (!actual.includes(expected)) {
-        issues.push(`${rel}: missing promoted skill "${expected}"`);
+        issues.push(
+          formatRuleIssue(
+            "manifest-drift",
+            rel,
+            `missing promoted skill "${expected}"`,
+            `add "${expected}" to "skills" in ${rel}`,
+          ),
+        );
       }
     }
     for (const listed of actual) {
       if (!expectedPromoted.includes(listed)) {
-        issues.push(`${rel}: lists non-promoted or absent skill "${listed}"`);
+        issues.push(
+          formatRuleIssue(
+            "manifest-drift",
+            rel,
+            `lists non-promoted or absent skill "${listed}"`,
+            `remove "${listed}" from "skills" in ${rel}`,
+          ),
+        );
       }
     }
   }
@@ -274,6 +433,7 @@ export function validateSkillsRepository(root = MODULE_ROOT): ValidationReport {
     .sort(compareCodeUnit);
 
   const issues = [
+    ...validateStraySkills(root),
     ...validateSkillFiles(root, entries),
     ...validateManifestSync(root, expectedPromoted),
   ];

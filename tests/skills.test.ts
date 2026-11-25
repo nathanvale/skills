@@ -21,6 +21,7 @@ import {
   repositoryRoot,
   validateSkillsRepository,
 } from "../src/skills-catalog/skills-catalog.ts";
+import { withCatalogCopy } from "./support/catalog-copy.ts";
 import { testFolder } from "./support/test-folder.ts";
 
 const repoCli = join(repositoryRoot(), "src", "cli.ts");
@@ -268,20 +269,6 @@ test("portable skill CLI bundles match fresh builds and repository catalogs stay
   }
 });
 
-function copyOfRepositoryCatalog(prefix: string): string {
-  const copy = testFolder(prefix);
-  cpSync(join(repositoryRoot(), "skills"), join(copy, "skills"), {
-    recursive: true,
-  });
-  cpSync(
-    join(repositoryRoot(), ".claude-plugin"),
-    join(copy, ".claude-plugin"),
-    { recursive: true },
-  );
-  cpSync(join(repositoryRoot(), "plugin.json"), join(copy, "plugin.json"));
-  return copy;
-}
-
 function issuesOrThrownError(root: string): readonly string[] {
   try {
     return validateSkillsRepository(root).issues;
@@ -291,8 +278,7 @@ function issuesOrThrownError(root: string): readonly string[] {
 }
 
 test("validate refuses a blank line after the opening front matter fence and a user-only skill without its Codex policy", () => {
-  const copy = copyOfRepositoryCatalog("skills-planted-");
-  try {
+  withCatalogCopy("skills-planted-", (copy) => {
     expect(validateSkillsRepository(copy).issues).toEqual([]);
 
     const skillFile = join(
@@ -306,40 +292,37 @@ test("validate refuses a blank line after the opening front matter fence and a u
     rmSync(join(copy, "skills/engineering/hello-world/agents/openai.yaml"));
 
     expect(validateSkillsRepository(copy).issues).toEqual([
-      'skills/engineering/hello-world: disable-model-invocation is true but Codex ignores it. Repair: add agents/openai.yaml with "policy:" and "  allow_implicit_invocation: false".',
+      '[typed-drift] skills/engineering/hello-world: disable-model-invocation is true but Codex ignores it. Repair: add agents/openai.yaml with "policy:" and "  allow_implicit_invocation: false". See agent-engineering ADR 0003.',
       'skills/engineering/weekly-hardening/SKILL.md: frontmatter must start with a field on the line after the opening "---". Repair: delete the blank line after "---".',
     ]);
-  } finally {
-    rmSync(copy, { recursive: true, force: true });
-  }
+  });
 });
 
 test("validate accepts a user-only skill only when Codex reads allow_implicit_invocation false under a top-level policy mapping", () => {
-  const copy = copyOfRepositoryCatalog("skills-codex-policy-");
-  const policyFile = join(
-    copy,
-    "skills/engineering/hello-world/agents/openai.yaml",
-  );
-  const refusal =
-    'skills/engineering/hello-world: disable-model-invocation is true but Codex ignores it. Repair: add agents/openai.yaml with "policy:" and "  allow_implicit_invocation: false".';
-  const plantedPolicies: Readonly<Record<string, string>> = {
-    "key at top level": "allow_implicit_invocation: false\n",
-    "key under interface while policy says true":
-      "interface:\n  allow_implicit_invocation: false\npolicy:\n  allow_implicit_invocation: true\n",
-    "policy nested under another parent":
-      "interface:\n  policy:\n    allow_implicit_invocation: false\n",
-    "text inside a block scalar while policy says true":
-      "interface:\n  default_prompt: |\n    allow_implicit_invocation: false\npolicy:\n  allow_implicit_invocation: true\n",
-    "text only inside a block scalar":
-      "interface:\n  default_prompt: |\n    allow_implicit_invocation: false\n",
-    "text only inside a comment":
-      "policy:\n  # allow_implicit_invocation: false\n",
-    "quoted string false": 'policy:\n  allow_implicit_invocation: "false"\n',
-    "broken YAML": "policy:\n  allow_implicit_invocation: [false\n",
-    "trailing comment after false":
-      "policy:\n  allow_implicit_invocation: false # manual only\n",
-  };
-  try {
+  withCatalogCopy("skills-codex-policy-", (copy) => {
+    const policyFile = join(
+      copy,
+      "skills/engineering/hello-world/agents/openai.yaml",
+    );
+    const refusal =
+      '[typed-drift] skills/engineering/hello-world: disable-model-invocation is true but Codex ignores it. Repair: add agents/openai.yaml with "policy:" and "  allow_implicit_invocation: false". See agent-engineering ADR 0003.';
+    const plantedPolicies: Readonly<Record<string, string>> = {
+      "key at top level": "allow_implicit_invocation: false\n",
+      "key under interface while policy says true":
+        "interface:\n  allow_implicit_invocation: false\npolicy:\n  allow_implicit_invocation: true\n",
+      "policy nested under another parent":
+        "interface:\n  policy:\n    allow_implicit_invocation: false\n",
+      "text inside a block scalar while policy says true":
+        "interface:\n  default_prompt: |\n    allow_implicit_invocation: false\npolicy:\n  allow_implicit_invocation: true\n",
+      "text only inside a block scalar":
+        "interface:\n  default_prompt: |\n    allow_implicit_invocation: false\n",
+      "text only inside a comment":
+        "policy:\n  # allow_implicit_invocation: false\n",
+      "quoted string false": 'policy:\n  allow_implicit_invocation: "false"\n',
+      "broken YAML": "policy:\n  allow_implicit_invocation: [false\n",
+      "trailing comment after false":
+        "policy:\n  allow_implicit_invocation: false # manual only\n",
+    };
     const outcomes: Record<string, readonly string[]> = {};
     for (const [label, contents] of Object.entries(plantedPolicies)) {
       writeFileSync(policyFile, contents);
@@ -367,9 +350,96 @@ test("validate accepts a user-only skill only when Codex reads allow_implicit_in
       "unreadable file": [refusal],
       "folder in place of the file": [refusal],
     });
-  } finally {
-    rmSync(copy, { recursive: true, force: true });
-  }
+  });
+});
+
+test("validate flags typed-drift and passes once Codex policy is restored", () => {
+  withCatalogCopy("skills-typed-drift-", (copy) => {
+    const policy = join(
+      copy,
+      "skills/engineering/hello-world/agents/openai.yaml",
+    );
+    rmSync(policy);
+    expect(validateSkillsRepository(copy).issues).toEqual([
+      '[typed-drift] skills/engineering/hello-world: disable-model-invocation is true but Codex ignores it. Repair: add agents/openai.yaml with "policy:" and "  allow_implicit_invocation: false". See agent-engineering ADR 0003.',
+    ]);
+    writeFileSync(policy, "policy:\n  allow_implicit_invocation: false\n");
+    expect(validateSkillsRepository(copy).issues).toEqual([]);
+  });
+});
+
+test("validate flags auto-drift and passes after adding the frontmatter marker or removing the policy", () => {
+  withCatalogCopy("skills-auto-drift-", (copy) => {
+    const skillFile = join(copy, "skills/engineering/test-design/SKILL.md");
+    const originalSkill = readFileSync(skillFile, "utf8");
+    const policyDir = join(copy, "skills/engineering/test-design/agents");
+    const policyFile = join(policyDir, "openai.yaml");
+    mkdirSync(policyDir, { recursive: true });
+    writeFileSync(policyFile, "policy:\n  allow_implicit_invocation: false\n");
+    expect(validateSkillsRepository(copy).issues).toEqual([
+      '[auto-drift] skills/engineering/test-design: agents/openai.yaml sets allow_implicit_invocation: false but SKILL.md lacks disable-model-invocation: true. Repair: add "disable-model-invocation: true" to SKILL.md front matter, or remove the policy if the skill should load automatically. See agent-engineering ADR 0003.',
+    ]);
+    writeFileSync(
+      skillFile,
+      originalSkill.replace(/^---\n/, "---\ndisable-model-invocation: true\n"),
+    );
+    expect(validateSkillsRepository(copy).issues).toEqual([]);
+    writeFileSync(skillFile, originalSkill);
+    rmSync(policyFile);
+    expect(validateSkillsRepository(copy).issues).toEqual([]);
+  });
+});
+
+test("validate flags stray-skill files outside known buckets and passes once moved or removed", () => {
+  withCatalogCopy("skills-stray-", (copy) => {
+    const strayPaths = [
+      join(copy, "skills/engineering/hello-world/nested/SKILL.md"),
+      join(copy, "skills/rogue/SKILL.md"),
+      join(copy, "skills/unknown-bucket/orphan/SKILL.md"),
+    ];
+    for (const file of strayPaths) {
+      mkdirSync(join(file, ".."), { recursive: true });
+      writeFileSync(file, "---\nname: stray\ndescription: stray\n---\n");
+    }
+    expect(validateSkillsRepository(copy).issues).toEqual([
+      "[stray-skill] skills/engineering/hello-world/nested/SKILL.md: SKILL.md is outside a known bucket folder (skills/<bucket>/<skill>/SKILL.md). Repair: move it into a bucket, or delete it. See agent-engineering ADR 0003.",
+      "[stray-skill] skills/rogue/SKILL.md: SKILL.md is outside a known bucket folder (skills/<bucket>/<skill>/SKILL.md). Repair: move it into a bucket, or delete it. See agent-engineering ADR 0003.",
+      "[stray-skill] skills/unknown-bucket/orphan/SKILL.md: SKILL.md is outside a known bucket folder (skills/<bucket>/<skill>/SKILL.md). Repair: move it into a bucket, or delete it. See agent-engineering ADR 0003.",
+    ]);
+    for (const file of strayPaths) rmSync(file);
+    mkdirSync(join(copy, "skills/in-progress/orphan"), { recursive: true });
+    writeFileSync(
+      join(copy, "skills/in-progress/orphan/SKILL.md"),
+      "---\nname: orphan\ndescription: moved into in-progress\n---\n",
+    );
+    expect(validateSkillsRepository(copy).issues).toEqual([]);
+  });
+});
+
+test("validate flags missing-manifest, invalid-manifest, and manifest-drift and passes once repaired", () => {
+  withCatalogCopy("skills-manifests-", (copy) => {
+    const manifestPath = join(copy, "plugin.json");
+    const original = readFileSync(manifestPath, "utf8");
+    rmSync(manifestPath);
+    expect(validateSkillsRepository(copy).issues).toEqual([
+      '[missing-manifest] plugin.json: missing or unreadable plugin manifest. Repair: ensure plugin.json is present and readable with a "skills" array listing every promoted skill. See agent-engineering ADR 0003.',
+    ]);
+    writeFileSync(manifestPath, "{broken");
+    expect(validateSkillsRepository(copy).issues).toEqual([
+      "[invalid-manifest] plugin.json: invalid JSON. Repair: fix the JSON syntax in plugin.json. See agent-engineering ADR 0003.",
+    ]);
+    const drifted = original.replace(
+      '"./skills/engineering/xdg"',
+      '"./skills/in-progress/google-contacts"',
+    );
+    writeFileSync(manifestPath, drifted);
+    expect(validateSkillsRepository(copy).issues).toEqual([
+      '[manifest-drift] plugin.json: missing promoted skill "./skills/engineering/xdg". Repair: add "./skills/engineering/xdg" to "skills" in plugin.json. See agent-engineering ADR 0003.',
+      '[manifest-drift] plugin.json: lists non-promoted or absent skill "./skills/in-progress/google-contacts". Repair: remove "./skills/in-progress/google-contacts" from "skills" in plugin.json. See agent-engineering ADR 0003.',
+    ]);
+    writeFileSync(manifestPath, original);
+    expect(validateSkillsRepository(copy).issues).toEqual([]);
+  });
 });
 
 test("xdg skill is thin, model-invoked, backed by sources.md, and uses a single-line YAML scalar description", () => {
