@@ -48,7 +48,7 @@ test("front-door CLI lists promoted skills, validates manifests, and runs greet"
             {
               name: "ci-reproduce",
               bucket: "engineering",
-              invocation: "model-invoked",
+              invocation: "user-invoked",
               promoted: true,
               portableCli: null,
             },
@@ -74,7 +74,7 @@ test("front-door CLI lists promoted skills, validates manifests, and runs greet"
             {
               name: "xdg",
               bucket: "engineering",
-              invocation: "model-invoked",
+              invocation: "user-invoked",
               promoted: true,
               portableCli: null,
             },
@@ -95,7 +95,7 @@ test("front-door CLI lists promoted skills, validates manifests, and runs greet"
             {
               name: "imessage-reader",
               bucket: "productivity",
-              invocation: "model-invoked",
+              invocation: "user-invoked",
               promoted: true,
               portableCli: null,
             },
@@ -397,7 +397,7 @@ test("xdg skill is thin, model-invoked, backed by sources.md, and uses a single-
   expect(entry).toMatchObject({
     name: "xdg",
     bucket: "engineering",
-    invocation: "model-invoked",
+    invocation: "user-invoked",
     promoted: true,
     portableCli: null,
   });

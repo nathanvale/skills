@@ -1,6 +1,7 @@
 ---
 name: xdg
 description: XDG Base Directory v0.8 rules for CLI config, data, state, cache, and runtime directories. Use when placing tool files under $XDG_*_HOME or $XDG_RUNTIME_DIR, naming app or suite subdirectories, creating 0700 directories, or resolving XDG env vars and relative paths.
+disable-model-invocation: true
 ---
 
 # XDG base directories

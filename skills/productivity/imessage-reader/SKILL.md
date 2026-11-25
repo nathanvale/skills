@@ -2,6 +2,7 @@
 name: imessage-reader
 description: "Read, search, watch, or explicitly send Apple Messages on macOS through imsg when the user names iMessage, SMS, Messages.app, or Mac message history."
 role: tool-workflow
+disable-model-invocation: true
 ---
 
 # Apple Messages
