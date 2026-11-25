@@ -5,6 +5,22 @@
   "license": "MIT",
   "type": "module",
   "packageManager": "bun@1.4.4",
+  "pi": {
+    "skills": [
+      "./skills/engineering/ci-reproduce",
+      "./skills/engineering/hello-world",
+      "./skills/engineering/test-design",
+      "./skills/engineering/weekly-hardening",
+      "./skills/engineering/xdg",
+      "./skills/experimental/delivery-slice",
+      "./skills/experimental/test-runner",
+      "./skills/productivity/imessage-reader",
+      "./skills/productivity/linear-intake"
+    ],
+    "extensions": [],
+    "prompts": [],
+    "themes": []
+  },
   "scripts": {
     "start": "bun run src/cli.ts",
     "regenerate": "bun run build:skills",

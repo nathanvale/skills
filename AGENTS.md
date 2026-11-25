@@ -29,7 +29,7 @@ Skills live in bucket folders under `skills/`:
 - `productivity/`: daily workflow skills (promoted)
 - `in-progress/`: beta skills (not promoted)
 
-Every skill in `engineering/`, `experimental/`, or `productivity/` must appear in `.claude-plugin/plugin.json`, `plugin.json`, `README.md`, and its bucket `README.md`.
+Every skill in `engineering/`, `experimental/`, or `productivity/` must appear in `.claude-plugin/plugin.json`, `plugin.json`, `package.json` `pi.skills`, `README.md`, and its bucket `README.md`.
 
 Skill-home placement and typed-only markers follow `agent-engineering` ADR 0003 (`docs/adr/0003-where-a-skill-lives.md`).
 

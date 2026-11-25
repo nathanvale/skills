@@ -1,8 +1,15 @@
 import { expect, test } from "bun:test";
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import {
   discoverSkills,
+  repositoryRoot,
   validateSkillsRepository,
 } from "../src/skills-catalog/skills-catalog.ts";
 import { withCatalogCopy } from "./support/catalog-copy.ts";
@@ -76,5 +83,109 @@ test("validate reads disable-model-invocation from parsed YAML frontmatter, igno
     expect(validateSkillsRepository(copy).issues).toEqual([
       '[typed-drift] skills/in-progress/yaml-probe: disable-model-invocation is true but Codex ignores it. Repair: add agents/openai.yaml with "policy:" and "  allow_implicit_invocation: false". See agent-engineering ADR 0003.',
     ]);
+  });
+});
+
+function readJsonObject(path: string): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(`Expected JSON object in ${path}`);
+  }
+  return Object.fromEntries(Object.entries(parsed));
+}
+
+function readStringField(
+  record: Record<string, unknown>,
+  key: string,
+): string[] {
+  const value = record[key];
+  if (!Array.isArray(value)) {
+    throw new Error(`Expected array for "${key}"`);
+  }
+  return value.map((item) => String(item));
+}
+
+test("validate checks package.json pi.skills for missing pi, missing promoted skills, and extra in-progress skills", () => {
+  withCatalogCopy("skills-pi-manifest-", (copy) => {
+    const packageJsonPath = join(copy, "package.json");
+    const original = readFileSync(packageJsonPath, "utf8");
+    const parsed = readJsonObject(packageJsonPath);
+
+    const withoutPi = Object.fromEntries(
+      Object.entries(parsed).filter(([key]) => key !== "pi"),
+    );
+    writeFileSync(packageJsonPath, `${JSON.stringify(withoutPi, null, 2)}\n`);
+    expect(validateSkillsRepository(copy).issues).toEqual([
+      '[missing-manifest] package.json: missing "pi" manifest. Repair: add a "pi" object with a "skills" array listing every promoted skill to package.json. See agent-engineering ADR 0003.',
+    ]);
+
+    const pluginSkills = readStringField(
+      readJsonObject(join(copy, ".claude-plugin", "plugin.json")),
+      "skills",
+    );
+    const missingPromoted = pluginSkills.filter(
+      (skill) => skill !== "./skills/engineering/xdg",
+    );
+    writeFileSync(
+      packageJsonPath,
+      `${JSON.stringify(
+        {
+          ...withoutPi,
+          pi: {
+            skills: missingPromoted,
+            extensions: [],
+            prompts: [],
+            themes: [],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    expect(validateSkillsRepository(copy).issues).toEqual([
+      '[invalid-manifest] package.json: missing promoted skill "./skills/engineering/xdg". Repair: add "./skills/engineering/xdg" to "pi.skills" in package.json. See agent-engineering ADR 0003.',
+    ]);
+
+    writeFileSync(
+      packageJsonPath,
+      `${JSON.stringify(
+        {
+          ...withoutPi,
+          pi: {
+            skills: [...pluginSkills, "./skills/in-progress/google-contacts"],
+            extensions: [],
+            prompts: [],
+            themes: [],
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    expect(validateSkillsRepository(copy).issues).toEqual([
+      '[invalid-manifest] package.json: lists non-promoted or absent skill "./skills/in-progress/google-contacts". Repair: remove "./skills/in-progress/google-contacts" from "pi.skills" in package.json. See agent-engineering ADR 0003.',
+    ]);
+
+    writeFileSync(packageJsonPath, original);
+    expect(validateSkillsRepository(copy).issues).toEqual([]);
+  });
+});
+
+test("repository package.json pi.skills matches .claude-plugin/plugin.json and passes validation", () => {
+  const root = repositoryRoot();
+  const packageJson = readJsonObject(join(root, "package.json"));
+  const claudePlugin = readJsonObject(
+    join(root, ".claude-plugin", "plugin.json"),
+  );
+  const pi = packageJson.pi;
+  expect(typeof pi === "object" && pi !== null && !Array.isArray(pi)).toBe(
+    true,
+  );
+  expect(
+    typeof pi === "object" && pi !== null ? Reflect.get(pi, "skills") : null,
+  ).toEqual(claudePlugin.skills);
+  expect(validateSkillsRepository(root)).toMatchObject({
+    valid: true,
+    issues: [],
   });
 });
