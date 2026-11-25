@@ -15,6 +15,10 @@ type PointerSkill = {
   readonly pinnedCommit: string;
 };
 
+type ClassifiedSkill =
+  | { readonly kind: "pointer"; readonly skill: PointerSkill }
+  | { readonly kind: "repo-local"; readonly name: string };
+
 function ownValue(value: unknown, key: string): unknown {
   if (typeof value !== "object" || value === null) return undefined;
   const found: unknown = Object.getOwnPropertyDescriptor(value, key)?.value;
@@ -35,21 +39,69 @@ function pinnedCommit(): string {
   return commit;
 }
 
-function pointerSkills(): PointerSkill[] {
-  const names = existsSync(skillFolder) ? readdirSync(skillFolder).sort() : [];
-  return names.flatMap((name) => {
-    const text = readFileSync(join(skillFolder, name, "SKILL.md"), "utf8");
-    const fullSkill = fullSkillLine.exec(text)?.[1];
-    if (fullSkill === undefined) return [];
-    return [
-      {
-        name,
-        fullSkill,
-        pinnedCommit: pinnedCommitLine.exec(text)?.[1] ?? "no Pinned commit",
-      },
-    ];
-  });
+function classifyAgentSkill(name: string, text: string): ClassifiedSkill {
+  const fullSkill = fullSkillLine.exec(text)?.[1];
+  const pinnedCommit = pinnedCommitLine.exec(text)?.[1];
+  if (fullSkill === undefined && pinnedCommit === undefined) {
+    return { kind: "repo-local", name };
+  }
+  return {
+    kind: "pointer",
+    skill: {
+      name,
+      fullSkill: fullSkill ?? "no Full skill",
+      pinnedCommit: pinnedCommit ?? "no Pinned commit",
+    },
+  };
 }
+
+function classifiedAgentSkills(): ClassifiedSkill[] {
+  const names = existsSync(skillFolder) ? readdirSync(skillFolder).sort() : [];
+  return names.map((name) =>
+    classifyAgentSkill(
+      name,
+      readFileSync(join(skillFolder, name, "SKILL.md"), "utf8"),
+    ),
+  );
+}
+
+function pointerSkills(): PointerSkill[] {
+  return classifiedAgentSkills().flatMap((entry) =>
+    entry.kind === "pointer" ? [entry.skill] : [],
+  );
+}
+
+function repoLocalSkills(): string[] {
+  return classifiedAgentSkills().flatMap((entry) =>
+    entry.kind === "repo-local" ? [entry.name] : [],
+  );
+}
+
+test("repository-local skills without kernel pointer lines live alongside pointer skills", () => {
+  expect(repoLocalSkills()).toContain("verify-delivery-slice");
+  expect(pointerSkills().map(({ name }) => name)).not.toContain(
+    "verify-delivery-slice",
+  );
+  expect(
+    classifyAgentSkill(
+      "local-probe",
+      "---\nname: local-probe\ndescription: Local skill\n---\n\n# Local\n",
+    ),
+  ).toEqual({ kind: "repo-local", name: "local-probe" });
+  expect(
+    classifyAgentSkill(
+      "partial-pointer",
+      "Pinned commit: `0123456789abcdef0123456789abcdef01234567`\n",
+    ),
+  ).toEqual({
+    kind: "pointer",
+    skill: {
+      name: "partial-pointer",
+      fullSkill: "no Full skill",
+      pinnedCommit: "0123456789abcdef0123456789abcdef01234567",
+    },
+  });
+});
 
 test("the repository has a pointer skill", () => {
   expect(
