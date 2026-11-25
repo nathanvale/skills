@@ -3,7 +3,7 @@
 Reusable agent skills built on `bun-typescript-template` and `agent-cli-kernel`.
 
 - **`src/` front-door CLI:** one repo-root `agent-cli-kernel` application CLI (`src/cli.ts`) for listing, validating, and running skill commands.
-- **Nested `skills/` buckets:** Matt Pocock-style category folders (`skills/engineering/`, `skills/productivity/`, `skills/in-progress/`) with `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, and root `plugin.json`.
+- **Nested `skills/` buckets:** Matt Pocock-style category folders (`skills/engineering/`, `skills/experimental/`, `skills/productivity/`, `skills/in-progress/`) with `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, and root `plugin.json`.
 - **Portable kernel-backed skills:** skills that need deterministic execution keep their TypeScript source under `src/skill-clis/` and ship a zero-`node_modules`, cross-platform `dist/cli.mjs` bundle built with `bun run build:skills`.
 
 ## Quick start
@@ -68,6 +68,15 @@ npx skills@latest add nathanvale/skills
 
 - **[imessage-reader](./skills/productivity/imessage-reader/SKILL.md)**: Read, search, watch, or explicitly send Apple Messages on macOS through imsg when the user names iMessage, SMS, Messages.app, or Mac message history.
 - **[linear-intake](./skills/productivity/linear-intake/SKILL.md)**: Capture a sourced idea in a Linear project's Triage, or triage existing intake into research, decisions or deferred work.
+
+### Experimental
+
+Experimental skills that load with the plugin but are not yet stable.
+
+**Model-invoked**
+
+- **[delivery-slice](./skills/experimental/delivery-slice/SKILL.md)**: Turn an accepted Wayfinder branch outcome into a reviewable spec draft and dependency-linked vertical-slice ticket drafts using to-spec and to-tickets. Use after a bounded outcome is agreed; unresolved planning belongs with Wayfinder.
+- **[test-runner](./skills/experimental/test-runner/SKILL.md)**: Run Bun tests: pass/fail gates, coverage, repair of failures in files you are editing, and triage of broader suite failures. Also proves and benchmarks the runner itself.
 
 ## Hooks
 
