@@ -22,7 +22,7 @@
     "format": "biome format --write ."
   },
   "dependencies": {
-    "agent-cli-kernel": "github:nathanvale/agent-cli-kernel#87d23cf123007f942f6169c3d60fdc45c1b1c3f8",
+    "agent-cli-kernel": "github:nathanvale/agent-cli-kernel#5eb8f295f0b97a98f23d3bfa2b3d1a4f9059374c",
     "libphonenumber-js": "^1.13.17"
   },
   "devDependencies": {

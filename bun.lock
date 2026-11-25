@@ -5,7 +5,7 @@
     "": {
       "name": "kernel-trial",
       "dependencies": {
-        "agent-cli-kernel": "github:nathanvale/agent-cli-kernel#87d23cf123007f942f6169c3d60fdc45c1b1c3f8",
+        "agent-cli-kernel": "github:nathanvale/agent-cli-kernel#5eb8f295f0b97a98f23d3bfa2b3d1a4f9059374c",
         "libphonenumber-js": "^1.13.17",
       },
       "devDependencies": {
@@ -229,7 +229,7 @@
 
     "acorn-jsx": ["acorn-jsx@5.3.2", "", { "peerDependencies": { "acorn": "^6.0.0 || ^7.0.0 || ^8.0.0" } }, "sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ=="],
 
-    "agent-cli-kernel": ["agent-cli-kernel@github:nathanvale/agent-cli-kernel#87d23cf", { "dependencies": { "@logtape/logtape": "2.4.2", "@logtape/redaction": "2.4.2" }, "peerDependencies": { "@eslint/js": "10.0.1", "typescript-eslint": "8.73.0" }, "optionalPeers": ["@eslint/js", "typescript-eslint"] }, "nathanvale-agent-cli-kernel-87d23cf", "sha512-3hZfIH/p6DUap7qjrNB0o/hrVLcg5ofalGvV0WQFMUHERZO+H6XIfZhjcdE+xfjTmyPi9N+66AuP2af/aALOLQ=="],
+    "agent-cli-kernel": ["agent-cli-kernel@github:nathanvale/agent-cli-kernel#5eb8f29", { "dependencies": { "@logtape/logtape": "2.4.2", "@logtape/redaction": "2.4.2" }, "peerDependencies": { "@eslint/js": "10.0.1", "typescript-eslint": "8.73.0" }, "optionalPeers": ["@eslint/js", "typescript-eslint"] }, "nathanvale-agent-cli-kernel-5eb8f29", "sha512-s6KmPDvW0Ad+tM//jdPDPKF32p+wl5yS2WdthWF2I6e4fl6sTH0KVWMmVF1KcCAnhrg3H21piNZk9HiqyaRhzA=="],
 
     "ajv": ["ajv@6.15.0", "", { "dependencies": { "fast-deep-equal": "^3.1.1", "fast-json-stable-stringify": "^2.0.0", "json-schema-traverse": "^0.4.1", "uri-js": "^4.2.2" } }, "sha512-fgFx7Hfoq60ytK2c7DhnF8jIvzYgOMxfugjLOSMHjLIPgenqa7S7oaagATUq99mV6IYvN2tRmC0wnTYX6iPbMw=="],
 
