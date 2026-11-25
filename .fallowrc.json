@@ -12,7 +12,9 @@
     "tests/cli.test.ts",
     "tests/skills.test.ts",
     "src/compaction-reground/compaction-reground.ts",
-    "src/google-contacts/cli.ts"
+    "src/google-contacts/cli.ts",
+    "skills/engineering/test-design/evals/smoke-definitions.ts",
+    "skills/productivity/imessage-reader/scripts/query-imessage.ts"
   ],
   "typeAware": {
     "enabled": true,
@@ -147,7 +149,14 @@
         "tests/**",
         "config/**",
         "eslint.config.mjs",
-        "scripts/**"
+        "scripts/**",
+        "skills/engineering/test-design/evals/smoke-definitions.ts",
+        "skills/engineering/test-design/tests/skill-contract.test.ts",
+        "skills/productivity/imessage-reader/scripts/fixtures.ts",
+        "skills/productivity/imessage-reader/scripts/lib.test.ts",
+        "skills/productivity/imessage-reader/scripts/lib.ts",
+        "skills/productivity/imessage-reader/scripts/query-imessage.ts",
+        "skills/productivity/imessage-reader/scripts/runtime-shims.d.ts"
       ]
     }
   }

@@ -13,11 +13,10 @@ inside this skill.
 
 ## Dependency
 
-- `imsg`: hard dependency. Install owner: the dotfiles Brewfile. Runtime owner:
-  <https://github.com/openclaw/imsg>.
-- Missing state: blocked. Next repair: propose adding
-  `steipete/tap/imsg` to the dotfiles Brewfile, then install it with
-  `brew bundle` after approval.
+- `imsg`: hard dependency. Install owner: Homebrew (`brew install steipete/tap/imsg`)
+  or your Homebrew Brewfile. Runtime owner: <https://github.com/openclaw/imsg>.
+- Missing state: blocked. Next repair: install `steipete/tap/imsg` with Homebrew
+  (or add it to your Homebrew Brewfile and run `brew bundle`) after approval.
 - macOS 14 or later with Messages.app signed in.
 - Full Disk Access for the parent process that reads messages.
 - Automation permission for the parent process that sends through Messages.app.

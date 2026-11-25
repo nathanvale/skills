@@ -46,10 +46,24 @@ test("front-door CLI lists promoted skills, validates manifests, and runs greet"
         data: {
           skills: [
             {
+              name: "ci-reproduce",
+              bucket: "engineering",
+              invocation: "model-invoked",
+              promoted: true,
+              portableCli: null,
+            },
+            {
               name: "hello-world",
               bucket: "engineering",
               promoted: true,
               portableCli: "skills/engineering/hello-world/dist/cli.mjs",
+            },
+            {
+              name: "test-design",
+              bucket: "engineering",
+              invocation: "model-invoked",
+              promoted: true,
+              portableCli: null,
             },
             {
               name: "weekly-hardening",
@@ -60,6 +74,20 @@ test("front-door CLI lists promoted skills, validates manifests, and runs greet"
             {
               name: "xdg",
               bucket: "engineering",
+              invocation: "model-invoked",
+              promoted: true,
+              portableCli: null,
+            },
+            {
+              name: "imessage-reader",
+              bucket: "productivity",
+              invocation: "model-invoked",
+              promoted: true,
+              portableCli: null,
+            },
+            {
+              name: "linear-intake",
+              bucket: "productivity",
               invocation: "model-invoked",
               promoted: true,
               portableCli: null,
@@ -81,7 +109,7 @@ test("front-door CLI lists promoted skills, validates manifests, and runs greet"
       result: {
         commandIdentity: "skills.validate",
         causeCode: "SUCCESS_UNCHANGED",
-        data: { valid: true, skillCount: 4, promotedCount: 3, issues: [] },
+        data: { valid: true, skillCount: 8, promotedCount: 7, issues: [] },
       },
     });
 
@@ -197,7 +225,7 @@ test("copied hello-world skill runs standalone in a sterile folder without node_
 test("portable skill CLI bundles match fresh builds and repository catalogs stay valid", async () => {
   expect(helloWorldContract.cli).toBe("hello-world");
   const skills = discoverSkills();
-  expect(skills.length).toBe(4);
+  expect(skills.length).toBe(8);
   expect(skills.find((item) => item.name === "google-contacts")).toMatchObject({
     name: "google-contacts",
     bucket: "in-progress",

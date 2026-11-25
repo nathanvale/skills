@@ -58,11 +58,16 @@ npx skills@latest add nathanvale/skills
 
 **Model-invoked**
 
+- **[ci-reproduce](./skills/engineering/ci-reproduce/SKILL.md)**: Diagnose failing CI builds, tests or deployments when local checks pass, build inputs differ, or remote logs are unavailable. Reproduce the failing stage and verify the correction in CI.
+- **[test-design](./skills/engineering/test-design/SKILL.md)**: Design or change tests, fixtures, mocks, snapshots, helpers, or harnesses; audit test-writing anti-patterns; select a proportional brief or read-only verdict.
 - **[xdg](./skills/engineering/xdg/SKILL.md)**: XDG Base Directory v0.8 rules for CLI config, data, state, cache, and runtime directories.
 
 ### Productivity
 
-None yet.
+**Model-invoked**
+
+- **[imessage-reader](./skills/productivity/imessage-reader/SKILL.md)**: Read, search, watch, or explicitly send Apple Messages on macOS through imsg when the user names iMessage, SMS, Messages.app, or Mac message history.
+- **[linear-intake](./skills/productivity/linear-intake/SKILL.md)**: Capture a sourced idea in a Linear project's Triage, or triage existing intake into research, decisions or deferred work.
 
 ## Hooks
 

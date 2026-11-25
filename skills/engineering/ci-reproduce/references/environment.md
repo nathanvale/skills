@@ -47,8 +47,8 @@ ssh mac-mini 'bash -s -- --vm gh-macos-26-runner --repo OWNER/NAME --ref REF -- 
   refuses to start while another Tart VM runs. OrbStack and Docker run Linux
   only.
 
-To rebuild the base, install Tart through the Brewfile's
-`HOMEBREW_DOTFILES_VM_HOST=1` opt-in, check free disk (the image is a 27 GB
+To rebuild the base, install Tart (for example via Homebrew:
+`brew install cirruslabs/cli/tart`), check free disk (the image is a 27 GB
 download), pin the image by digest, then size and prepare it:
 
 ```sh

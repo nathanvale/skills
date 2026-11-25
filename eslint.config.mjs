@@ -134,6 +134,17 @@ export default tseslint.config(
     languageOptions: { parser: tseslint.parser },
   },
   {
+    files: ["skills/**/*.ts"],
+    languageOptions: { parser: tseslint.parser },
+  },
+  {
+    files: ["skills/productivity/imessage-reader/scripts/lib.test.ts"],
+    rules: {
+      "repository/no-host-path-literal": "off",
+      "repository/tests-use-test-folder": "off",
+    },
+  },
+  {
     files: ["**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}"],
     plugins: { "anti-slop": antiSlop },
     rules: {

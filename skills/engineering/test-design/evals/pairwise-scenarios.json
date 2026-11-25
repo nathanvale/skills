@@ -6,9 +6,7 @@
       "prompt": "While tdd remains the active workflow, change the repository-owned test concerning fresh installation, activation, and host discovery at the existing seam.",
       "artifact": "test",
       "handback": "tdd",
-      "profiles": [
-        "installation-host-hosted"
-      ],
+      "profiles": ["installation-host-hosted"],
       "operation": "change",
       "seam": "existing",
       "expected": {
@@ -23,9 +21,7 @@
       "prompt": "While diagnosing-bugs remains the active workflow, run the repository-owned test concerning public CLI exit status, stdout, and timeout semantics at the new seam.",
       "artifact": "test",
       "handback": "diagnosing-bugs",
-      "profiles": [
-        "process-and-cli"
-      ],
+      "profiles": ["process-and-cli"],
       "operation": "run",
       "seam": "new",
       "expected": {
@@ -40,9 +36,7 @@
       "prompt": "While ci-testbed remains the active workflow, read the repository-owned test concerning Bun and Node behaviour across CI platforms at the disputed seam.",
       "artifact": "test",
       "handback": "ci-testbed",
-      "profiles": [
-        "runtime-ci-platform"
-      ],
+      "profiles": ["runtime-ci-platform"],
       "operation": "read",
       "seam": "disputed",
       "expected": {
@@ -57,9 +51,7 @@
       "prompt": "While cli-design remains the active workflow, read the repository-owned test concerning browser-rendered accessible labels and navigation at the existing seam.",
       "artifact": "test",
       "handback": "cli-design",
-      "profiles": [
-        "browser-and-ui"
-      ],
+      "profiles": ["browser-and-ui"],
       "operation": "read",
       "seam": "existing",
       "expected": {
@@ -74,9 +66,7 @@
       "prompt": "While test-runner remains the active workflow, run the repository-owned test concerning durable ownership, concurrent claims, and crash recovery at the disputed seam.",
       "artifact": "test",
       "handback": "test-runner",
-      "profiles": [
-        "state-concurrency-recovery"
-      ],
+      "profiles": ["state-concurrency-recovery"],
       "operation": "run",
       "seam": "disputed",
       "expected": {
@@ -91,9 +81,7 @@
       "prompt": "While tdd remains the active workflow, create the repository-owned test concerning Bun and Node behaviour across CI platforms at the new seam.",
       "artifact": "test",
       "handback": "tdd",
-      "profiles": [
-        "runtime-ci-platform"
-      ],
+      "profiles": ["runtime-ci-platform"],
       "operation": "create",
       "seam": "new",
       "expected": {
@@ -108,9 +96,7 @@
       "prompt": "While tdd remains the active workflow, read the repository-owned fixture concerning Bun and Node behaviour across CI platforms at the existing seam.",
       "artifact": "fixture",
       "handback": "tdd",
-      "profiles": [
-        "runtime-ci-platform"
-      ],
+      "profiles": ["runtime-ci-platform"],
       "operation": "read",
       "seam": "existing",
       "expected": {
@@ -125,9 +111,7 @@
       "prompt": "While diagnosing-bugs remains the active workflow, run the repository-owned fixture concerning Bun and Node behaviour across CI platforms at the existing seam.",
       "artifact": "fixture",
       "handback": "diagnosing-bugs",
-      "profiles": [
-        "runtime-ci-platform"
-      ],
+      "profiles": ["runtime-ci-platform"],
       "operation": "run",
       "seam": "existing",
       "expected": {
@@ -142,9 +126,7 @@
       "prompt": "While ci-testbed remains the active workflow, run the repository-owned fixture concerning public CLI exit status, stdout, and timeout semantics at the new seam.",
       "artifact": "fixture",
       "handback": "ci-testbed",
-      "profiles": [
-        "process-and-cli"
-      ],
+      "profiles": ["process-and-cli"],
       "operation": "run",
       "seam": "new",
       "expected": {
@@ -159,9 +141,7 @@
       "prompt": "While cli-design remains the active workflow, run the repository-owned fixture concerning browser-rendered accessible labels and navigation at the new seam.",
       "artifact": "fixture",
       "handback": "cli-design",
-      "profiles": [
-        "browser-and-ui"
-      ],
+      "profiles": ["browser-and-ui"],
       "operation": "run",
       "seam": "new",
       "expected": {
@@ -176,9 +156,7 @@
       "prompt": "While test-runner remains the active workflow, change the repository-owned fixture concerning durable ownership, concurrent claims, and crash recovery at the disputed seam.",
       "artifact": "fixture",
       "handback": "test-runner",
-      "profiles": [
-        "state-concurrency-recovery"
-      ],
+      "profiles": ["state-concurrency-recovery"],
       "operation": "change",
       "seam": "disputed",
       "expected": {
@@ -193,9 +171,7 @@
       "prompt": "While tdd remains the active workflow, create the repository-owned fixture concerning fresh installation, activation, and host discovery at the new seam.",
       "artifact": "fixture",
       "handback": "tdd",
-      "profiles": [
-        "installation-host-hosted"
-      ],
+      "profiles": ["installation-host-hosted"],
       "operation": "create",
       "seam": "new",
       "expected": {
@@ -210,9 +186,7 @@
       "prompt": "While tdd remains the active workflow, create the repository-owned mock concerning durable ownership, concurrent claims, and crash recovery at the new seam.",
       "artifact": "mock",
       "handback": "tdd",
-      "profiles": [
-        "state-concurrency-recovery"
-      ],
+      "profiles": ["state-concurrency-recovery"],
       "operation": "create",
       "seam": "new",
       "expected": {
@@ -227,9 +201,7 @@
       "prompt": "While diagnosing-bugs remains the active workflow, change the repository-owned mock concerning Bun and Node behaviour across CI platforms at the disputed seam.",
       "artifact": "mock",
       "handback": "diagnosing-bugs",
-      "profiles": [
-        "runtime-ci-platform"
-      ],
+      "profiles": ["runtime-ci-platform"],
       "operation": "change",
       "seam": "disputed",
       "expected": {
@@ -244,9 +216,7 @@
       "prompt": "While ci-testbed remains the active workflow, read the repository-owned mock concerning durable ownership, concurrent claims, and crash recovery at the new seam.",
       "artifact": "mock",
       "handback": "ci-testbed",
-      "profiles": [
-        "state-concurrency-recovery"
-      ],
+      "profiles": ["state-concurrency-recovery"],
       "operation": "read",
       "seam": "new",
       "expected": {
@@ -261,9 +231,7 @@
       "prompt": "While cli-design remains the active workflow, create the repository-owned mock concerning public CLI exit status, stdout, and timeout semantics at the existing seam.",
       "artifact": "mock",
       "handback": "cli-design",
-      "profiles": [
-        "process-and-cli"
-      ],
+      "profiles": ["process-and-cli"],
       "operation": "create",
       "seam": "existing",
       "expected": {
@@ -278,9 +246,7 @@
       "prompt": "While test-runner remains the active workflow, run the repository-owned mock concerning fresh installation, activation, and host discovery at the new seam.",
       "artifact": "mock",
       "handback": "test-runner",
-      "profiles": [
-        "installation-host-hosted"
-      ],
+      "profiles": ["installation-host-hosted"],
       "operation": "run",
       "seam": "new",
       "expected": {
@@ -295,9 +261,7 @@
       "prompt": "While tdd remains the active workflow, read the repository-owned mock concerning browser-rendered accessible labels and navigation at the disputed seam.",
       "artifact": "mock",
       "handback": "tdd",
-      "profiles": [
-        "browser-and-ui"
-      ],
+      "profiles": ["browser-and-ui"],
       "operation": "read",
       "seam": "disputed",
       "expected": {
@@ -312,9 +276,7 @@
       "prompt": "While tdd remains the active workflow, run the repository-owned snapshot concerning Bun and Node behaviour across CI platforms at the disputed seam.",
       "artifact": "snapshot",
       "handback": "tdd",
-      "profiles": [
-        "runtime-ci-platform"
-      ],
+      "profiles": ["runtime-ci-platform"],
       "operation": "run",
       "seam": "disputed",
       "expected": {
@@ -329,9 +291,7 @@
       "prompt": "While diagnosing-bugs remains the active workflow, create the repository-owned snapshot concerning browser-rendered accessible labels and navigation at the existing seam.",
       "artifact": "snapshot",
       "handback": "diagnosing-bugs",
-      "profiles": [
-        "browser-and-ui"
-      ],
+      "profiles": ["browser-and-ui"],
       "operation": "create",
       "seam": "existing",
       "expected": {
@@ -346,9 +306,7 @@
       "prompt": "While ci-testbed remains the active workflow, run the repository-owned snapshot concerning fresh installation, activation, and host discovery at the disputed seam.",
       "artifact": "snapshot",
       "handback": "ci-testbed",
-      "profiles": [
-        "installation-host-hosted"
-      ],
+      "profiles": ["installation-host-hosted"],
       "operation": "run",
       "seam": "disputed",
       "expected": {
@@ -363,9 +321,7 @@
       "prompt": "While cli-design remains the active workflow, read the repository-owned snapshot concerning durable ownership, concurrent claims, and crash recovery at the new seam.",
       "artifact": "snapshot",
       "handback": "cli-design",
-      "profiles": [
-        "state-concurrency-recovery"
-      ],
+      "profiles": ["state-concurrency-recovery"],
       "operation": "read",
       "seam": "new",
       "expected": {
@@ -380,9 +336,7 @@
       "prompt": "While test-runner remains the active workflow, create the repository-owned snapshot concerning Bun and Node behaviour across CI platforms at the new seam.",
       "artifact": "snapshot",
       "handback": "test-runner",
-      "profiles": [
-        "runtime-ci-platform"
-      ],
+      "profiles": ["runtime-ci-platform"],
       "operation": "create",
       "seam": "new",
       "expected": {
@@ -397,9 +351,7 @@
       "prompt": "While tdd remains the active workflow, change the repository-owned snapshot concerning public CLI exit status, stdout, and timeout semantics at the disputed seam.",
       "artifact": "snapshot",
       "handback": "tdd",
-      "profiles": [
-        "process-and-cli"
-      ],
+      "profiles": ["process-and-cli"],
       "operation": "change",
       "seam": "disputed",
       "expected": {
@@ -414,9 +366,7 @@
       "prompt": "While tdd remains the active workflow, change the repository-owned test-helper concerning public CLI exit status, stdout, and timeout semantics at the new seam.",
       "artifact": "test-helper",
       "handback": "tdd",
-      "profiles": [
-        "process-and-cli"
-      ],
+      "profiles": ["process-and-cli"],
       "operation": "change",
       "seam": "new",
       "expected": {
@@ -431,9 +381,7 @@
       "prompt": "While diagnosing-bugs remains the active workflow, read the repository-owned test-helper concerning fresh installation, activation, and host discovery at the new seam.",
       "artifact": "test-helper",
       "handback": "diagnosing-bugs",
-      "profiles": [
-        "installation-host-hosted"
-      ],
+      "profiles": ["installation-host-hosted"],
       "operation": "read",
       "seam": "new",
       "expected": {
@@ -448,9 +396,7 @@
       "prompt": "While ci-testbed remains the active workflow, change the repository-owned test-helper concerning browser-rendered accessible labels and navigation at the existing seam.",
       "artifact": "test-helper",
       "handback": "ci-testbed",
-      "profiles": [
-        "browser-and-ui"
-      ],
+      "profiles": ["browser-and-ui"],
       "operation": "change",
       "seam": "existing",
       "expected": {
@@ -465,9 +411,7 @@
       "prompt": "While cli-design remains the active workflow, create the repository-owned test-helper concerning Bun and Node behaviour across CI platforms at the disputed seam.",
       "artifact": "test-helper",
       "handback": "cli-design",
-      "profiles": [
-        "runtime-ci-platform"
-      ],
+      "profiles": ["runtime-ci-platform"],
       "operation": "create",
       "seam": "disputed",
       "expected": {
@@ -482,9 +426,7 @@
       "prompt": "While test-runner remains the active workflow, change the repository-owned test-helper concerning browser-rendered accessible labels and navigation at the existing seam.",
       "artifact": "test-helper",
       "handback": "test-runner",
-      "profiles": [
-        "browser-and-ui"
-      ],
+      "profiles": ["browser-and-ui"],
       "operation": "change",
       "seam": "existing",
       "expected": {
@@ -499,9 +441,7 @@
       "prompt": "While tdd remains the active workflow, run the repository-owned test-helper concerning durable ownership, concurrent claims, and crash recovery at the existing seam.",
       "artifact": "test-helper",
       "handback": "tdd",
-      "profiles": [
-        "state-concurrency-recovery"
-      ],
+      "profiles": ["state-concurrency-recovery"],
       "operation": "run",
       "seam": "existing",
       "expected": {
@@ -516,9 +456,7 @@
       "prompt": "While tdd remains the active workflow, change the repository-owned test-harness concerning browser-rendered accessible labels and navigation at the new seam.",
       "artifact": "test-harness",
       "handback": "tdd",
-      "profiles": [
-        "browser-and-ui"
-      ],
+      "profiles": ["browser-and-ui"],
       "operation": "change",
       "seam": "new",
       "expected": {
@@ -533,9 +471,7 @@
       "prompt": "While diagnosing-bugs remains the active workflow, create the repository-owned test-harness concerning durable ownership, concurrent claims, and crash recovery at the new seam.",
       "artifact": "test-harness",
       "handback": "diagnosing-bugs",
-      "profiles": [
-        "state-concurrency-recovery"
-      ],
+      "profiles": ["state-concurrency-recovery"],
       "operation": "create",
       "seam": "new",
       "expected": {
@@ -550,9 +486,7 @@
       "prompt": "While ci-testbed remains the active workflow, create the repository-owned test-harness concerning durable ownership, concurrent claims, and crash recovery at the new seam.",
       "artifact": "test-harness",
       "handback": "ci-testbed",
-      "profiles": [
-        "state-concurrency-recovery"
-      ],
+      "profiles": ["state-concurrency-recovery"],
       "operation": "create",
       "seam": "new",
       "expected": {
@@ -567,9 +501,7 @@
       "prompt": "While cli-design remains the active workflow, change the repository-owned test-harness concerning fresh installation, activation, and host discovery at the disputed seam.",
       "artifact": "test-harness",
       "handback": "cli-design",
-      "profiles": [
-        "installation-host-hosted"
-      ],
+      "profiles": ["installation-host-hosted"],
       "operation": "change",
       "seam": "disputed",
       "expected": {
@@ -584,9 +516,7 @@
       "prompt": "While test-runner remains the active workflow, read the repository-owned test-harness concerning public CLI exit status, stdout, and timeout semantics at the existing seam.",
       "artifact": "test-harness",
       "handback": "test-runner",
-      "profiles": [
-        "process-and-cli"
-      ],
+      "profiles": ["process-and-cli"],
       "operation": "read",
       "seam": "existing",
       "expected": {
@@ -601,9 +531,7 @@
       "prompt": "While tdd remains the active workflow, run the repository-owned test-harness concerning Bun and Node behaviour across CI platforms at the disputed seam.",
       "artifact": "test-harness",
       "handback": "tdd",
-      "profiles": [
-        "runtime-ci-platform"
-      ],
+      "profiles": ["runtime-ci-platform"],
       "operation": "run",
       "seam": "disputed",
       "expected": {
@@ -618,9 +546,7 @@
       "prompt": "While tdd remains the active workflow, change the repository-owned test so its Bun one-shot versus watch mode, exact selector count, and retained machine reporter prove the existing seam.",
       "artifact": "test",
       "handback": "tdd",
-      "profiles": [
-        "runner-execution"
-      ],
+      "profiles": ["runner-execution"],
       "operation": "change",
       "seam": "existing",
       "expected": {
@@ -635,9 +561,7 @@
       "prompt": "While diagnosing-bugs remains the active workflow, create a repository-owned fixture for runner file isolation, within-file concurrency, randomized-order seed replay, and module-mock restoration at a new seam.",
       "artifact": "fixture",
       "handback": "diagnosing-bugs",
-      "profiles": [
-        "runner-execution"
-      ],
+      "profiles": ["runner-execution"],
       "operation": "create",
       "seam": "new",
       "expected": {
@@ -652,9 +576,7 @@
       "prompt": "While ci-testbed remains the active workflow, run the existing repository-owned mock test with its runtime version, transform path, module cache, and restoration owner unchanged at the disputed seam.",
       "artifact": "mock",
       "handback": "ci-testbed",
-      "profiles": [
-        "runner-execution"
-      ],
+      "profiles": ["runner-execution"],
       "operation": "run",
       "seam": "disputed",
       "expected": {
@@ -669,9 +591,7 @@
       "prompt": "While cli-design remains the active workflow, read the existing repository-owned snapshot test reporter and application-output separation at the existing seam without changing an artifact.",
       "artifact": "snapshot",
       "handback": "cli-design",
-      "profiles": [
-        "runner-execution"
-      ],
+      "profiles": ["runner-execution"],
       "operation": "read",
       "seam": "existing",
       "expected": {
@@ -686,9 +606,7 @@
       "prompt": "While test-runner remains the active workflow, change the repository-owned test helper for within-file concurrency, timeout cancellation, and resource cleanup at a new seam.",
       "artifact": "test-helper",
       "handback": "test-runner",
-      "profiles": [
-        "runner-execution"
-      ],
+      "profiles": ["runner-execution"],
       "operation": "change",
       "seam": "new",
       "expected": {
@@ -703,9 +621,7 @@
       "prompt": "While tdd remains the active workflow, create a repository-owned test-harness concerning only one-shot runner termination, exact selector file and test counts, and a protocol-complete reporter receipt at the disputed seam. Runtime, CI, platform compatibility, public-process lifecycle, durable state, installation, browser, and hosted claims are explicitly outside this change.",
       "artifact": "test-harness",
       "handback": "tdd",
-      "profiles": [
-        "runner-execution"
-      ],
+      "profiles": ["runner-execution"],
       "operation": "create",
       "seam": "disputed",
       "expected": {
