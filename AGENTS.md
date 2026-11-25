@@ -31,6 +31,8 @@ Skills live in bucket folders under `skills/`:
 
 Every skill in `engineering/`, `experimental/`, or `productivity/` must appear in `.claude-plugin/plugin.json`, `plugin.json`, `README.md`, and its bucket `README.md`.
 
+Skill-home placement and typed-only markers follow `agent-engineering` ADR 0003 (`docs/adr/0003-where-a-skill-lives.md`).
+
 ## Portable kernel skill CLIs
 
 Skills that ship an executable `agent-cli-kernel` CLI follow one of two layouts, both covered by `kernelLint`, `tsc`, `bun test`, `fallow`, and `bun run build:skills` (outputting a zero-dependency bundle to `skills/<bucket>/<skill>/dist/cli.mjs`):
