@@ -2,4 +2,5 @@
 auto = "disable"
 
 [test]
+preload = ["./tests/support/test-run-folder.ts"]
 pathIgnorePatterns = ["skills/experimental/test-runner/dist/fixtures/**"]
