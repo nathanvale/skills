@@ -21,6 +21,7 @@ import {
   repositoryRoot,
   validateSkillsRepository,
 } from "../src/skills-catalog/skills-catalog.ts";
+import { withCatalogCopy } from "./support/catalog-copy.ts";
 import { testFolder } from "./support/test-folder.ts";
 
 const repoCli = join(repositoryRoot(), "src", "cli.ts");
@@ -268,24 +269,6 @@ test("portable skill CLI bundles match fresh builds and repository catalogs stay
   }
 });
 
-function withCatalogCopy(prefix: string, run: (copy: string) => void): void {
-  const copy = testFolder(prefix);
-  cpSync(join(repositoryRoot(), "skills"), join(copy, "skills"), {
-    recursive: true,
-  });
-  cpSync(
-    join(repositoryRoot(), ".claude-plugin"),
-    join(copy, ".claude-plugin"),
-    { recursive: true },
-  );
-  cpSync(join(repositoryRoot(), "plugin.json"), join(copy, "plugin.json"));
-  try {
-    run(copy);
-  } finally {
-    rmSync(copy, { recursive: true, force: true });
-  }
-}
-
 function issuesOrThrownError(root: string): readonly string[] {
   try {
     return validateSkillsRepository(root).issues;
@@ -439,11 +422,11 @@ test("validate flags missing-manifest, invalid-manifest, and manifest-drift and 
     const original = readFileSync(manifestPath, "utf8");
     rmSync(manifestPath);
     expect(validateSkillsRepository(copy).issues).toEqual([
-      '[missing-manifest] plugin.json: missing plugin manifest. Repair: restore plugin.json with a "skills" array listing every promoted skill. See agent-engineering ADR 0003.',
+      '[missing-manifest] plugin.json: missing or unreadable plugin manifest. Repair: ensure plugin.json is present and readable with a "skills" array listing every promoted skill. See agent-engineering ADR 0003.',
     ]);
     writeFileSync(manifestPath, "{broken");
     expect(validateSkillsRepository(copy).issues).toEqual([
-      "[invalid-manifest] plugin.json: unreadable or invalid JSON. Repair: fix the JSON syntax in plugin.json. See agent-engineering ADR 0003.",
+      "[invalid-manifest] plugin.json: invalid JSON. Repair: fix the JSON syntax in plugin.json. See agent-engineering ADR 0003.",
     ]);
     const drifted = original.replace(
       '"./skills/engineering/xdg"',

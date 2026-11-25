@@ -53,35 +53,38 @@ function compareCodeUnit(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-function unquoteYamlScalar(raw: string): string {
-  const trimmed = raw.trim();
-  if (
-    trimmed.length >= 2 &&
-    ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-      (trimmed.startsWith("'") && trimmed.endsWith("'")))
-  ) {
-    return trimmed.slice(1, -1);
-  }
-  return trimmed;
+function asYamlMapping(value: unknown): object | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value
+    : null;
 }
 
-function parseFrontmatter(
-  markdown: string,
-): ReadonlyMap<string, string> | null {
+function parseFrontmatter(markdown: string): object | null {
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(markdown);
   if (match === null) return null;
   const block = match[1] ?? "";
-  const fields = new Map<string, string>();
-  for (const rawLine of block.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (line.length === 0 || line.startsWith("#")) continue;
-    const colon = line.indexOf(":");
-    if (colon <= 0) continue;
-    const key = line.slice(0, colon).trim();
-    const value = unquoteYamlScalar(line.slice(colon + 1));
-    fields.set(key, value);
+  try {
+    return asYamlMapping(YAML.parse(block));
+  } catch {
+    return null;
   }
-  return fields;
+}
+
+function readFrontmatterString(
+  frontmatter: object | null,
+  key: string,
+): string | null {
+  if (frontmatter === null || !Object.hasOwn(frontmatter, key)) return null;
+  const value: unknown = Reflect.get(frontmatter, key);
+  return typeof value === "string" ? value : null;
+}
+
+function isModelInvocationDisabled(frontmatter: object | null): boolean {
+  return (
+    frontmatter !== null &&
+    Object.hasOwn(frontmatter, "disable-model-invocation") &&
+    Reflect.get(frontmatter, "disable-model-invocation") === true
+  );
 }
 
 const ADR_0003_POINTER = "See agent-engineering ADR 0003.";
@@ -103,13 +106,21 @@ function formatRuleIssue(
   return `[${rule}] ${subject}: ${detail}. Repair: ${repair}. ${ADR_0003_POINTER}`;
 }
 
-function parseJsonFile(
-  path: string,
-): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+type JsonReadResult =
+  | { readonly ok: true; readonly value: unknown }
+  | { readonly ok: false; readonly reason: "read" | "parse" };
+
+function parseJsonFile(path: string): JsonReadResult {
+  let raw: string;
   try {
-    return { ok: true, value: JSON.parse(readFileSync(path, "utf8")) };
+    raw = readFileSync(path, "utf8");
   } catch {
-    return { ok: false };
+    return { ok: false, reason: "read" };
+  }
+  try {
+    return { ok: true, value: JSON.parse(raw) };
+  } catch {
+    return { ok: false, reason: "parse" };
   }
 }
 
@@ -120,25 +131,25 @@ function readManifestSkills(
   readonly skills: readonly string[] | null;
   readonly issue: string | null;
 } {
-  if (!existsSync(manifestPath)) {
-    return {
-      skills: null,
-      issue: formatRuleIssue(
-        "missing-manifest",
-        rel,
-        "missing plugin manifest",
-        `restore ${rel} with a "skills" array listing every promoted skill`,
-      ),
-    };
-  }
   const parsed = parseJsonFile(manifestPath);
   if (!parsed.ok) {
+    if (parsed.reason === "read") {
+      return {
+        skills: null,
+        issue: formatRuleIssue(
+          "missing-manifest",
+          rel,
+          "missing or unreadable plugin manifest",
+          `ensure ${rel} is present and readable with a "skills" array listing every promoted skill`,
+        ),
+      };
+    }
     return {
       skills: null,
       issue: formatRuleIssue(
         "invalid-manifest",
         rel,
-        "unreadable or invalid JSON",
+        "invalid JSON",
         `fix the JSON syntax in ${rel}`,
       ),
     };
@@ -226,9 +237,9 @@ export function discoverSkills(root = MODULE_ROOT): readonly SkillEntry[] {
       const skillFile = join(skillFolder, "SKILL.md");
       if (!existsSync(skillFile)) continue;
       const fields = parseFrontmatter(readFileSync(skillFile, "utf8"));
-      const name = fields?.get("name") ?? skillDir;
-      const description = fields?.get("description") ?? "";
-      const disabled = fields?.get("disable-model-invocation") === "true";
+      const name = readFrontmatterString(fields, "name") ?? skillDir;
+      const description = readFrontmatterString(fields, "description") ?? "";
+      const disabled = isModelInvocationDisabled(fields);
       const cliBundle = join(skillFolder, "dist", "cli.mjs");
       entries.push({
         name,
@@ -247,12 +258,6 @@ export function discoverSkills(root = MODULE_ROOT): readonly SkillEntry[] {
 }
 
 const FRONTMATTER_OPENS_WITH_A_FIELD = /^---\r?\n[A-Za-z]/;
-
-function asYamlMapping(value: unknown): object | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value
-    : null;
-}
 
 function readYamlOrNull(path: string): unknown {
   try {
@@ -361,8 +366,8 @@ function validateSkillFiles(
     }
     const markerIssue = invocationMarkerIssue(root, entry);
     if (markerIssue !== null) issues.push(markerIssue);
-    const declaredName = fields.get("name") ?? "";
-    const description = fields.get("description") ?? "";
+    const declaredName = readFrontmatterString(fields, "name") ?? "";
+    const description = readFrontmatterString(fields, "description") ?? "";
     if (declaredName.trim().length === 0) {
       issues.push(`${entry.skillPath}/SKILL.md: missing frontmatter "name"`);
     }
