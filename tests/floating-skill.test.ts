@@ -335,3 +335,25 @@ test("floating-skill check ignores the three tool-owned app folders", () => {
     rmSync(home, { recursive: true, force: true });
   }
 });
+
+test("floating-skill check and floating-skill list skip a symlink that loops to itself and still report the other floating skills", () => {
+  const home = testFolder("floating-skill-loop-");
+  try {
+    const folder = join(home, ".agents", "skills");
+    mkdirSync(join(folder, "planted"), { recursive: true });
+    writeFileSync(
+      join(folder, "planted", "SKILL.md"),
+      "---\nname: planted\ndescription: planted\n---\n",
+    );
+    symlinkSync("aaa-loop", join(folder, "aaa-loop"));
+
+    const checked = runFloatingSkillCheck(home, ["--json"]);
+    expect(checked.exitCode).toBe(3);
+
+    const listed = runFloatingSkillList(home, ["--json"]);
+    expect(listed.exitCode).toBe(0);
+    expect(listed.stdout).toContain(join(folder, "planted", "SKILL.md"));
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});

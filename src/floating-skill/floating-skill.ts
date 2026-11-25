@@ -41,11 +41,11 @@ function compareCodeUnit(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-function isMissingPathError(error: unknown): boolean {
+function isUntraversablePathError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   if (!Object.hasOwn(error, "code")) return false;
   const code: unknown = Reflect.get(error, "code");
-  return code === "ENOENT" || code === "ENOTDIR";
+  return code === "ENOENT" || code === "ENOTDIR" || code === "ELOOP";
 }
 
 function readLinkTargetOrNull(path: string): string | null {
@@ -67,7 +67,7 @@ function inspectSkillEntry(
   try {
     linkStat = lstatSync(skillFilePath);
   } catch (error) {
-    if (isMissingPathError(error)) return null;
+    if (isUntraversablePathError(error)) return null;
     throw error;
   }
 
@@ -100,7 +100,7 @@ function entryCanContainSkill(
   try {
     return statSync(entryPath).isDirectory();
   } catch (error) {
-    if (isMissingPathError(error)) return false;
+    if (isUntraversablePathError(error)) return false;
     throw error;
   }
 }
@@ -115,7 +115,7 @@ function scanUserSkillFolder(
   try {
     entries = readdirSync(folderPath, { withFileTypes: true });
   } catch (error) {
-    if (isMissingPathError(error)) return;
+    if (isUntraversablePathError(error)) return;
     throw error;
   }
 
