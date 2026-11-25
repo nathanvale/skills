@@ -2,6 +2,15 @@ import { YAML } from "bun";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  asObjectMapping,
+  compareCodeUnit,
+  decodePiManifestSkills,
+  decodePluginManifestSkills,
+  formatRuleIssue,
+  type JsonReadResult,
+  validateSkillsList,
+} from "./rules.ts";
 
 export type SkillBucket =
   | "engineering"
@@ -49,22 +58,12 @@ const MODULE_ROOT = resolve(
   "..",
 );
 
-function compareCodeUnit(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
-
-function asYamlMapping(value: unknown): object | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value
-    : null;
-}
-
 function parseFrontmatter(markdown: string): object | null {
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(markdown);
   if (match === null) return null;
   const block = match[1] ?? "";
   try {
-    return asYamlMapping(YAML.parse(block));
+    return asObjectMapping(YAML.parse(block));
   } catch {
     return null;
   }
@@ -87,29 +86,6 @@ function isModelInvocationDisabled(frontmatter: object | null): boolean {
   );
 }
 
-const ADR_0003_POINTER = "See agent-engineering ADR 0003.";
-
-type CatalogRule =
-  | "typed-drift"
-  | "auto-drift"
-  | "stray-skill"
-  | "missing-manifest"
-  | "invalid-manifest"
-  | "manifest-drift";
-
-function formatRuleIssue(
-  rule: CatalogRule,
-  subject: string,
-  detail: string,
-  repair: string,
-): string {
-  return `[${rule}] ${subject}: ${detail}. Repair: ${repair}. ${ADR_0003_POINTER}`;
-}
-
-type JsonReadResult =
-  | { readonly ok: true; readonly value: unknown }
-  | { readonly ok: false; readonly reason: "read" | "parse" };
-
 function parseJsonFile(path: string): JsonReadResult {
   let raw: string;
   try {
@@ -122,92 +98,6 @@ function parseJsonFile(path: string): JsonReadResult {
   } catch {
     return { ok: false, reason: "parse" };
   }
-}
-
-function readManifestSkills(
-  manifestPath: string,
-  rel: string,
-): {
-  readonly skills: readonly string[] | null;
-  readonly issue: string | null;
-} {
-  const parsed = parseJsonFile(manifestPath);
-  if (!parsed.ok) {
-    if (parsed.reason === "read") {
-      return {
-        skills: null,
-        issue: formatRuleIssue(
-          "missing-manifest",
-          rel,
-          "missing or unreadable plugin manifest",
-          `ensure ${rel} is present and readable with a "skills" array listing every promoted skill`,
-        ),
-      };
-    }
-    return {
-      skills: null,
-      issue: formatRuleIssue(
-        "invalid-manifest",
-        rel,
-        "invalid JSON",
-        `fix the JSON syntax in ${rel}`,
-      ),
-    };
-  }
-  if (
-    typeof parsed.value !== "object" ||
-    parsed.value === null ||
-    Array.isArray(parsed.value)
-  ) {
-    return {
-      skills: null,
-      issue: formatRuleIssue(
-        "invalid-manifest",
-        rel,
-        "expected JSON object",
-        `write a JSON object with a "skills" array in ${rel}`,
-      ),
-    };
-  }
-  if (!Object.hasOwn(parsed.value, "skills")) {
-    return {
-      skills: null,
-      issue: formatRuleIssue(
-        "invalid-manifest",
-        rel,
-        'missing "skills" array',
-        `add a "skills" array listing every promoted skill to ${rel}`,
-      ),
-    };
-  }
-  const rawSkills: unknown = Reflect.get(parsed.value, "skills");
-  if (!Array.isArray(rawSkills)) {
-    return {
-      skills: null,
-      issue: formatRuleIssue(
-        "invalid-manifest",
-        rel,
-        '"skills" must be an array',
-        `set "skills" to an array of skill paths in ${rel}`,
-      ),
-    };
-  }
-  const items: string[] = [];
-  for (const item of rawSkills) {
-    if (typeof item !== "string") {
-      return {
-        skills: null,
-        issue: formatRuleIssue(
-          "invalid-manifest",
-          rel,
-          'every "skills" entry must be a string',
-          `list each skill path as a string in ${rel}`,
-        ),
-      };
-    }
-    items.push(item);
-  }
-  return { skills: items, issue: null };
 }
 
 export function repositoryRoot(): string {
@@ -268,11 +158,11 @@ function readYamlOrNull(path: string): unknown {
 }
 
 function codexRefusesImplicitInvocation(document: unknown): boolean {
-  const root = asYamlMapping(document);
+  const root = asObjectMapping(document);
   if (root === null || !Object.hasOwn(root, "policy")) {
     return false;
   }
-  const policy = asYamlMapping(Reflect.get(root, "policy"));
+  const policy = asObjectMapping(Reflect.get(root, "policy"));
   return (
     policy !== null &&
     Object.hasOwn(policy, "allow_implicit_invocation") &&
@@ -280,7 +170,22 @@ function codexRefusesImplicitInvocation(document: unknown): boolean {
   );
 }
 
-function invocationMarkerIssue(root: string, entry: SkillEntry): string | null {
+function invocationMarkerIssue(
+  root: string,
+  entry: SkillEntry,
+  frontmatter: object,
+): string | null {
+  if (
+    Object.hasOwn(frontmatter, "disable-model-invocation") &&
+    Reflect.get(frontmatter, "disable-model-invocation") !== true
+  ) {
+    return formatRuleIssue(
+      "typed-drift",
+      entry.skillPath,
+      "disable-model-invocation must be the YAML boolean true",
+      "write disable-model-invocation: true, or remove the key for an automatic skill",
+    );
+  }
   const policyPath = join(root, entry.skillPath, "agents", "openai.yaml");
   const codexDisabled = codexRefusesImplicitInvocation(
     readYamlOrNull(policyPath),
@@ -364,7 +269,7 @@ function validateSkillFiles(
         `${entry.skillPath}/SKILL.md: frontmatter must start with a field on the line after the opening "---". Repair: delete the blank line after "---".`,
       );
     }
-    const markerIssue = invocationMarkerIssue(root, entry);
+    const markerIssue = invocationMarkerIssue(root, entry, fields);
     if (markerIssue !== null) issues.push(markerIssue);
     const declaredName = readFrontmatterString(fields, "name") ?? "";
     const description = readFrontmatterString(fields, "description") ?? "";
@@ -391,36 +296,36 @@ function validateManifestSync(
   ];
   for (const manifestPath of manifestPaths) {
     const rel = relative(root, manifestPath).split("\\").join("/");
-    const result = readManifestSkills(manifestPath, rel);
+    const result = decodePluginManifestSkills(parseJsonFile(manifestPath), rel);
     if (result.issue !== null) {
       issues.push(result.issue);
       continue;
     }
-    const actual = [...(result.skills ?? [])].sort(compareCodeUnit);
-    for (const expected of expectedPromoted) {
-      if (!actual.includes(expected)) {
-        issues.push(
-          formatRuleIssue(
-            "manifest-drift",
-            rel,
-            `missing promoted skill "${expected}"`,
-            `add "${expected}" to "skills" in ${rel}`,
-          ),
-        );
-      }
-    }
-    for (const listed of actual) {
-      if (!expectedPromoted.includes(listed)) {
-        issues.push(
-          formatRuleIssue(
-            "manifest-drift",
-            rel,
-            `lists non-promoted or absent skill "${listed}"`,
-            `remove "${listed}" from "skills" in ${rel}`,
-          ),
-        );
-      }
-    }
+    issues.push(
+      ...validateSkillsList(
+        "manifest-drift",
+        rel,
+        "skills",
+        result.skills ?? [],
+        expectedPromoted,
+      ),
+    );
+  }
+  const piResult = decodePiManifestSkills(
+    parseJsonFile(join(root, "package.json")),
+  );
+  if (piResult.issue !== null) {
+    issues.push(piResult.issue);
+  } else {
+    issues.push(
+      ...validateSkillsList(
+        "invalid-manifest",
+        "package.json",
+        "pi.skills",
+        piResult.skills ?? [],
+        expectedPromoted,
+      ),
+    );
   }
   return issues;
 }

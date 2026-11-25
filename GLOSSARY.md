@@ -21,7 +21,7 @@ The per-conversation JSON file under `<state folder>/compaction-cursors/<convers
 _Avoid_: Checkpoint cache, transcript offset, scan state
 
 **Typed drift**:
-Validation rule `typed-drift`. A skill whose `SKILL.md` sets `disable-model-invocation: true` without an `agents/openai.yaml` that sets `policy.allow_implicit_invocation: false`, leaving Codex able to invoke it implicitly.
+Validation rule `typed-drift`. A skill whose `SKILL.md` sets `disable-model-invocation: true` without an `agents/openai.yaml` that sets `policy.allow_implicit_invocation: false`, leaving Codex able to invoke it implicitly. Also a `disable-model-invocation` value other than the YAML boolean `true` (for example `"true"`, `yes` or `false`), which Claude Code and Pi read as automatic.
 _Avoid_: Missing Codex policy
 
 **Auto drift**:

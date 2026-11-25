@@ -17,6 +17,7 @@ export function withCatalogCopy(
     { recursive: true },
   );
   cpSync(join(repositoryRoot(), "plugin.json"), join(copy, "plugin.json"));
+  cpSync(join(repositoryRoot(), "package.json"), join(copy, "package.json"));
   try {
     run(copy);
   } finally {
