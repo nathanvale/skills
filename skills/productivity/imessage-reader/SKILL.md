@@ -91,8 +91,4 @@ inside this skill.
 
 ## Legacy Boundary
 
-The previous Bun reader under `skills/imessage-reader/scripts/` is preserved
-for comparison during this prototype but is not the runtime owner of the new
-workflow. Do not invoke it unless the user explicitly asks to compare legacy
-behavior. Remove or archive it only after the `imsg` path is accepted and
-installed.
+`imsg` is the only reader supported by this skill. The legacy Bun reader is not included in this public skill.

@@ -1,26 +1,6 @@
 {
   "kind": "health",
   "finding_counts": {
-    "skills/engineering/test-design/evals/smoke-definitions.ts": {
-      "complexity_moderate": {
-        "count": 1
-      }
-    },
-    "skills/productivity/imessage-reader/scripts/lib.test.ts": {
-      "complexity_moderate": {
-        "count": 1
-      }
-    },
-    "skills/productivity/imessage-reader/scripts/lib.ts": {
-      "complexity_moderate": {
-        "count": 1
-      }
-    },
-    "skills/productivity/imessage-reader/scripts/query-imessage.ts": {
-      "complexity_moderate": {
-        "count": 1
-      }
-    },
     "src/skills-catalog/skills-catalog.ts": {
       "complexity_moderate": {
         "count": 1
@@ -33,26 +13,6 @@
     }
   },
   "identity_finding_counts": {
-    "skills/engineering/test-design/evals/smoke-definitions.ts\u0000<file>": {
-      "complexity_moderate": {
-        "count": 1
-      }
-    },
-    "skills/productivity/imessage-reader/scripts/lib.test.ts\u0000<file>": {
-      "complexity_moderate": {
-        "count": 1
-      }
-    },
-    "skills/productivity/imessage-reader/scripts/lib.ts\u0000<file>": {
-      "complexity_moderate": {
-        "count": 1
-      }
-    },
-    "skills/productivity/imessage-reader/scripts/query-imessage.ts\u0000<file>": {
-      "complexity_moderate": {
-        "count": 1
-      }
-    },
     "src/skills-catalog/skills-catalog.ts\u0000discoverSkills": {
       "complexity_moderate": {
         "count": 1

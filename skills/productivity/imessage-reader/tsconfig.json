@@ -1,9 +1,0 @@
-{
-  "extends": "../../../tsconfig.base.json",
-  "compilerOptions": {
-    "rootDir": "./scripts",
-    "exactOptionalPropertyTypes": false
-  },
-  "include": ["scripts/**/*.ts", "scripts/**/*.d.ts"],
-  "exclude": ["node_modules", "dist"]
-}
