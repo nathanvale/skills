@@ -1,6 +1,7 @@
 ---
 name: ci-reproduce
 description: "Diagnose failing CI builds, tests or deployments when local checks pass, build inputs differ, or remote logs are unavailable. Reproduce the failing stage and verify the correction in CI."
+disable-model-invocation: true
 ---
 
 # Reproduce CI failures
