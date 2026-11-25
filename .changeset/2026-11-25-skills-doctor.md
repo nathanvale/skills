@@ -1,0 +1,5 @@
+---
+"skills": patch
+---
+
+Add a read-only `skills doctor` command (`--home <path>`) that scans user-level agent skill folders for floating skills (`floating-skill`, `DOMAIN_FLOATING_SKILLS`) per agent-engineering ADR 0003.

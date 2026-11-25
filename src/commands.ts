@@ -12,11 +12,23 @@ import {
   discoverSkills,
   validateSkillsRepository,
 } from "./skills-catalog/skills-catalog.ts";
+import {
+  FLOATING_SKILL_REPAIR,
+  inspectUserSkillFolders,
+} from "./skills-doctor/skills-doctor.ts";
 
 const causes = {
   ...sharedCauses,
   ...helloWorldCauses,
   DOMAIN_SKILLS_INVALID: {
+    outcome: "refused",
+    transactionState: "unchanged",
+    failureClass: "domain",
+    exitCode: 3,
+    retryable: false,
+    guidance: "next",
+  },
+  DOMAIN_FLOATING_SKILLS: {
     outcome: "refused",
     transactionState: "unchanged",
     failureClass: "domain",
@@ -171,6 +183,103 @@ const validate = command({
   },
 });
 
+const doctor = command({
+  identity: "skills.doctor",
+  route: ["doctor"],
+  summary:
+    "Check user-level skill folders for floating skills (agent-engineering ADR 0003).",
+  input: {
+    ...noInput,
+    options: [
+      {
+        name: "--home",
+        aliases: [],
+        summary:
+          "Home directory to scan (defaults to the current user's home directory).",
+        required: false,
+        repeatable: false,
+        value: {
+          kind: "string",
+          minLength: 1,
+          maxLength: 4096,
+          choices: null,
+          pattern: null,
+        },
+      },
+    ],
+  },
+  capabilities: {},
+  stations: [
+    station(causes, {
+      ...stationWords,
+      commandIdentity: "skills.doctor",
+      causeCode: succeeded,
+      trigger:
+        "No floating SKILL.md files exist in the scanned user-level skill folders.",
+      guidance: { next: { kind: "done" } },
+      repairAction: null,
+      independentObservable:
+        "Zero floating skills across the checked user-level folders.",
+    }),
+    station(causes, {
+      ...stationWords,
+      commandIdentity: "skills.doctor",
+      causeCode: "DOMAIN_FLOATING_SKILLS",
+      trigger:
+        "One or more SKILL.md files sit in a scanned user-level skill folder outside a plugin or repository.",
+      guidance: {
+        next: {
+          kind: "instruction",
+          text: `Repair: ${FLOATING_SKILL_REPAIR}`,
+        },
+      },
+      repairAction: `Repair: ${FLOATING_SKILL_REPAIR}`,
+      independentObservable:
+        "At least one SKILL.md was found in a scanned user-level skill folder.",
+    }),
+  ],
+  run: (input, context) => {
+    const report = inspectUserSkillFolders(input["--home"]);
+    if (report.findings.length > 0) {
+      const listed = report.findings
+        .map((finding) =>
+          finding.symlinkTarget === null
+            ? finding.path
+            : `${finding.path} -> ${finding.symlinkTarget}`,
+        )
+        .join(", ");
+      return context.result(
+        {
+          commandIdentity: "skills.doctor",
+          causeCode: "DOMAIN_FLOATING_SKILLS",
+        },
+        {
+          message: `[floating-skill] ${String(report.findings.length)} floating skill(s) found: ${listed}. Repair: ${FLOATING_SKILL_REPAIR}`,
+          data: null,
+          effects: noEffects,
+        },
+      );
+    }
+    return context.result(
+      {
+        commandIdentity: "skills.doctor",
+        causeCode: succeeded,
+      },
+      {
+        message: `No floating skills found across ${String(report.checkedFolders.length)} user-level folders.`,
+        data: report,
+        effects: noEffects,
+      },
+    );
+  },
+});
+
 export const skillCauses = causes;
 
-export const commands = [status, list, validate, helloWorldCommand] as const;
+export const commands = [
+  status,
+  list,
+  validate,
+  doctor,
+  helloWorldCommand,
+] as const;

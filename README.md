@@ -13,9 +13,12 @@ bun install --frozen-lockfile
 bun run start -- --help
 bun run start -- list
 bun run start -- validate
+bun run start -- doctor
 bun run start -- greet World
 bun run check
 ```
+
+`bun run start -- doctor` checks user-level skill folders for floating skills per agent-engineering ADR 0003 (`--home <path>` overrides the home directory).
 
 ## Installation
 
