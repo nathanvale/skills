@@ -134,6 +134,10 @@ export default tseslint.config(
     languageOptions: { parser: tseslint.parser },
   },
   {
+    files: ["skills/**/*.ts"],
+    languageOptions: { parser: tseslint.parser },
+  },
+  {
     files: ["**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}"],
     plugins: { "anti-slop": antiSlop },
     rules: {

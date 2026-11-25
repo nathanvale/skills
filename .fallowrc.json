@@ -12,7 +12,8 @@
     "tests/cli.test.ts",
     "tests/skills.test.ts",
     "src/compaction-reground/compaction-reground.ts",
-    "src/google-contacts/cli.ts"
+    "src/google-contacts/cli.ts",
+    "skills/engineering/test-design/evals/smoke-definitions.ts"
   ],
   "typeAware": {
     "enabled": true,
@@ -147,7 +148,10 @@
         "tests/**",
         "config/**",
         "eslint.config.mjs",
-        "scripts/**"
+        "scripts/**",
+        "skills/engineering/test-design/evals/smoke-definitions.ts",
+        "skills/engineering/test-design/evals/smoke-pairwise.ts",
+        "skills/engineering/test-design/tests/skill-contract.test.ts"
       ]
     }
   }

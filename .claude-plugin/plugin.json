@@ -9,8 +9,12 @@
   "repository": "https://github.com/nathanvale/skills",
   "hooks": "./hooks/claude/hooks.json",
   "skills": [
+    "./skills/engineering/ci-reproduce",
     "./skills/engineering/hello-world",
+    "./skills/engineering/test-design",
     "./skills/engineering/weekly-hardening",
-    "./skills/engineering/xdg"
+    "./skills/engineering/xdg",
+    "./skills/productivity/imessage-reader",
+    "./skills/productivity/linear-intake"
   ]
 }

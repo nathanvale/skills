@@ -4,9 +4,13 @@
   "license": "MIT",
   "name": "nathanvale-skills",
   "skills": [
+    "./skills/engineering/ci-reproduce",
     "./skills/engineering/hello-world",
+    "./skills/engineering/test-design",
     "./skills/engineering/weekly-hardening",
-    "./skills/engineering/xdg"
+    "./skills/engineering/xdg",
+    "./skills/productivity/imessage-reader",
+    "./skills/productivity/linear-intake"
   ],
   "version": "0.1.0"
 }
