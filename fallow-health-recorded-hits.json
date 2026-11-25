@@ -65,11 +65,5 @@
     }
   },
   "runtime_coverage_findings": [],
-  "target_keys": [
-    "src/google-contacts/web-firewall/rules.ts:high impact",
-    "src/compaction-reground/compaction-reground.ts:hidden coupling",
-    "tests/support/google-contacts-processes.ts:high impact",
-    "src/google-contacts/decoders/rules.ts:high impact",
-    "tests/compaction-reground.test.ts:hidden coupling"
-  ]
+  "target_keys": []
 }
