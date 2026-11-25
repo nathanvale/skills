@@ -62,7 +62,7 @@ journey. If the isolated target or approval is absent, report blocked.
 A foreground writer applying the candidate instructions qualifies that user path,
 not autonomous native-catalogue publication. An explicit-source desktop session
 qualifies only its observed behavior. Keep the source-loading and capability
-distinctions from the native capabilities reference.
+distinctions in the [native reference](../references/native-capabilities.md#capability-present-and-source-loading-boundaries).
 Observed no-write behavior is not a complete remote audit or a global enforcement
 guarantee. A known saved object with a withheld receipt does not reproduce a
 provider timeout or a failed relation write. Report those fault-injection paths

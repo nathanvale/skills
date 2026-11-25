@@ -12,7 +12,7 @@ Verify dependencies through the user conversation.
 
 Ask delivery-slice to turn the supplied Wayfinder outcome into draft delivery
 artifacts. This is the explicit entry point. Qualify implicit selection separately
-through the native selection and capability-present recipe.
+through the [native selection recipe](../references/native-capabilities.md#selection-and-capability-present-behavior).
 
 ## Driving it with native candidate sessions
 

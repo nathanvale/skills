@@ -13,7 +13,7 @@ Verify draft boundary through the user conversation.
 
 Ask delivery-slice to turn the supplied Wayfinder outcome into draft delivery
 artifacts. This is the explicit entry point. Qualify implicit selection separately
-through the native selection and capability-present recipe.
+through the [native selection recipe](../references/native-capabilities.md#selection-and-capability-present-behavior).
 
 ## Driving it with native candidate sessions
 
@@ -27,7 +27,7 @@ Preconditions: Launch and Doctor pass; use the private run directory.
   the linked Codex recipe when selecting that Harness.
 - Observe: judge each F5 sub-feature against the response and tool events;
   retain evidence and complete Cleanup.
-- For F5.4, follow the separate capability-present recipe in the native reference.
+- For F5.4, follow the separate capability-present recipe in the [native reference](../references/native-capabilities.md#capability-present-and-source-loading-boundaries).
   Keep F5.3's bounded absent-tools proof distinct. Explicit-source desktop loading
   does not establish installed-catalogue discovery or live CLI access.
 
