@@ -79,6 +79,20 @@ test("front-door CLI lists promoted skills, validates manifests, and runs greet"
               portableCli: null,
             },
             {
+              name: "delivery-slice",
+              bucket: "experimental",
+              invocation: "model-invoked",
+              promoted: true,
+              portableCli: null,
+            },
+            {
+              name: "test-runner",
+              bucket: "experimental",
+              invocation: "model-invoked",
+              promoted: true,
+              portableCli: null,
+            },
+            {
               name: "imessage-reader",
               bucket: "productivity",
               invocation: "model-invoked",
@@ -109,7 +123,7 @@ test("front-door CLI lists promoted skills, validates manifests, and runs greet"
       result: {
         commandIdentity: "skills.validate",
         causeCode: "SUCCESS_UNCHANGED",
-        data: { valid: true, skillCount: 8, promotedCount: 7, issues: [] },
+        data: { valid: true, skillCount: 10, promotedCount: 9, issues: [] },
       },
     });
 
@@ -225,7 +239,7 @@ test("copied hello-world skill runs standalone in a sterile folder without node_
 test("portable skill CLI bundles match fresh builds and repository catalogs stay valid", async () => {
   expect(helloWorldContract.cli).toBe("hello-world");
   const skills = discoverSkills();
-  expect(skills.length).toBe(8);
+  expect(skills.length).toBe(10);
   expect(skills.find((item) => item.name === "google-contacts")).toMatchObject({
     name: "google-contacts",
     bucket: "in-progress",

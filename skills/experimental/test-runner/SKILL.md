@@ -10,7 +10,7 @@ Agent Runner for Bun test context.
 
 ## Status
 
-- Use for Bun pass/fail, coverage, failure repair, triage, benchmark evidence, and output-contract development.
+- Use for Bun pass/fail, coverage, failure repair, triage, and benchmark evidence.
 - Use compact mode for routine Bun test gates.
 - Use repair mode for hot-context failures in files already being edited.
 - Use triage mode for cold-context failures from broader suites or unopened files.
@@ -20,14 +20,10 @@ Agent Runner for Bun test context.
 
 ## Owner
 
-- Skill prose: `skills/engineering/test-runner/SKILL.md`.
-- Command contract and discovery: `skills/engineering/test-runner/src/command-contract.ts`.
-- CLI, parser, result model, and runtime behavior: `skills/engineering/test-runner/src/test-runner.ts`.
-- Detail artifact read/write behavior: `skills/engineering/test-runner/src/test-runner.ts`.
-- Repo-local front doors: `skills/engineering/test-runner/package.json#scripts`.
-- Missing-runtime shell preflight: `skills/engineering/test-runner/src/test-runner.sh`.
-- Tests: `skills/engineering/test-runner/src/test-runner.test.ts`.
-- Runner Benchmark Harness: `skills/engineering/test-runner/src/test-runner.benchmark.ts`.
+- Skill prose: `SKILL.md` in this skill directory.
+- Bundled runner CLI and shell preflight: `dist/test-runner.sh` and `dist/test-runner.js`.
+- Bundled benchmark harness and fixtures: `dist/test-runner.benchmark.js` and `dist/fixtures/`.
+- Runner source, tests, and bundle rebuilds: the maintainer's private source.
 - Evidence output: `${XDG_STATE_HOME:-~/.local/state}/test-runner/benchmark-output/`.
 
 ## Commands
@@ -35,21 +31,19 @@ Agent Runner for Bun test context.
 - Set `SKILL_DIR` to this loaded skill directory. Inspect runner usage with `"$SKILL_DIR/dist/test-runner.sh" --help`.
 - Inspect benchmark usage with `bun --no-install "$SKILL_DIR/dist/test-runner.benchmark.js" --help`.
 - Prove no-MCP Bun adoption: `bun --no-install "$SKILL_DIR/dist/test-runner.benchmark.js" --no-mcp-baseline --local-runner "$SKILL_DIR/dist/test-runner.sh" --mode fixed-gate --gate-preset bun-no-mcp`.
-- For runner routing, read `config/agents/claude/context/bun-runner.md`.
 
 ## Verification
 
-- Run `bun --filter test-runner-scripts test` after runner, command-contract, detail-artifact, or benchmark changes.
-- Run `bun --filter test-runner-scripts typecheck` after TypeScript edits.
-- Run the fixed-gate benchmark before changing normal runner guidance.
+- Verify the published bundle with `"$SKILL_DIR/dist/test-runner.sh" --help` and the fixed-gate benchmark before changing runner guidance.
+- Maintain runner source code, typechecks, unit tests, and bundle rebuilds in the maintainer's private source.
 
 ## Safety
 
-- Pass test-target args only after the runner separator.
+- Pass test-target args only after the runner separator (`--`).
 - Keep generated evidence under the runtime-state output path unless deliberately promoted.
 - Keep generated detail under `${XDG_STATE_HOME:-~/.local/state}/test-runner/runner-output/` unless deliberately promoted.
-- Do not copy flags, output schemas, parser states, or exit tables into this file.
-- Use script help and tests for deterministic behavior.
+- Keep flags, output schemas, parser states, and exit tables in the CLI help rather than duplicating them here.
+- Use script help and fixtures for deterministic behavior.
 
 ## Next Safe Action
 

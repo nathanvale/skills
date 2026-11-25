@@ -1,2 +1,5 @@
 [install]
 auto = "disable"
+
+[test]
+pathIgnorePatterns = ["skills/experimental/test-runner/dist/fixtures/**"]

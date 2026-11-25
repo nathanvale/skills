@@ -9,6 +9,8 @@
     "./skills/engineering/test-design",
     "./skills/engineering/weekly-hardening",
     "./skills/engineering/xdg",
+    "./skills/experimental/delivery-slice",
+    "./skills/experimental/test-runner",
     "./skills/productivity/imessage-reader",
     "./skills/productivity/linear-intake"
   ],

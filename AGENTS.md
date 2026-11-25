@@ -25,10 +25,11 @@ Template source: `80a63a7b244d3fd87c5b63dea45cdda6d0f5de0c`
 Skills live in bucket folders under `skills/`:
 
 - `engineering/`: daily engineering and repository hardening skills (promoted)
+- `experimental/`: skills that load but are not yet stable
 - `productivity/`: daily workflow skills (promoted)
 - `in-progress/`: beta skills (not promoted)
 
-Every skill in `engineering/` or `productivity/` must appear in `.claude-plugin/plugin.json`, `plugin.json`, `README.md`, and its bucket `README.md`.
+Every skill in `engineering/`, `experimental/`, or `productivity/` must appear in `.claude-plugin/plugin.json`, `plugin.json`, `README.md`, and its bucket `README.md`.
 
 ## Portable kernel skill CLIs
 
