@@ -50,9 +50,8 @@ const launcherFolder = join(repositoryRoot, "hooks", "coordinator");
 const launcherName = "compaction-reground.sh";
 const launcher = join(launcherFolder, launcherName);
 const logicRelativePath = join(
-  "src",
-  "compaction-reground",
-  "compaction-reground.ts",
+  "hooks/coordinator/dist",
+  "compaction-reground.mjs",
 );
 const bunDirectory = dirname(process.execPath);
 const systemShellFolder = "/bin";

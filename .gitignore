@@ -2,6 +2,8 @@ node_modules/
 /dist/
 !skills/*/*/dist/
 !skills/*/*/dist/cli.mjs
+!hooks/*/dist/
+!hooks/*/dist/compaction-reground.mjs
 coverage/
 .fallow/
 .DS_Store
