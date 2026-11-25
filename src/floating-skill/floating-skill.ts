@@ -29,6 +29,7 @@ const USER_SKILL_FOLDERS = [
   ".agents/skills",
   ".codex/skills",
   ".gemini/config/skills",
+  ".pi/agent/skills",
 ] as const;
 
 const SKIPPED_APP_FOLDERS: ReadonlySet<string> = new Set([
