@@ -12,11 +12,23 @@ import {
   discoverSkills,
   validateSkillsRepository,
 } from "./skills-catalog/skills-catalog.ts";
+import {
+  FLOATING_SKILL_REPAIR,
+  inspectUserSkillFolders,
+} from "./floating-skill/floating-skill.ts";
 
 const causes = {
   ...sharedCauses,
   ...helloWorldCauses,
   DOMAIN_SKILLS_INVALID: {
+    outcome: "refused",
+    transactionState: "unchanged",
+    failureClass: "domain",
+    exitCode: 3,
+    retryable: false,
+    guidance: "next",
+  },
+  DOMAIN_FLOATING_SKILLS: {
     outcome: "refused",
     transactionState: "unchanged",
     failureClass: "domain",
@@ -171,6 +183,139 @@ const validate = command({
   },
 });
 
+const FLOATING_SKILL_PREVIEW_LIMIT = 5;
+
+const floatingSkillInput = {
+  ...noInput,
+  options: [
+    {
+      name: "--home",
+      aliases: [],
+      summary:
+        "Home directory to scan (defaults to the current user's home directory).",
+      required: false,
+      repeatable: false,
+      value: {
+        kind: "string",
+        minLength: 1,
+        maxLength: 4096,
+        choices: null,
+        pattern: null,
+      },
+    },
+  ],
+} as const;
+
+const floatingSkillCheck = command({
+  identity: "skills.floating-skill.check",
+  route: ["floating-skill", "check"],
+  summary:
+    "Check user-level skill folders for floating skills (agent-engineering ADR 0003); run floating-skill list for the full list.",
+  input: floatingSkillInput,
+  capabilities: {},
+  stations: [
+    station(causes, {
+      ...stationWords,
+      commandIdentity: "skills.floating-skill.check",
+      causeCode: succeeded,
+      trigger:
+        "No floating SKILL.md files exist in the scanned user-level skill folders.",
+      guidance: { next: { kind: "done" } },
+      repairAction: null,
+      independentObservable:
+        "Zero floating skills across the checked user-level folders.",
+    }),
+    station(causes, {
+      ...stationWords,
+      commandIdentity: "skills.floating-skill.check",
+      causeCode: "DOMAIN_FLOATING_SKILLS",
+      trigger:
+        "One or more SKILL.md files sit in a scanned user-level skill folder outside a plugin or repository.",
+      guidance: {
+        next: {
+          kind: "command",
+          command: "skills.floating-skill.list",
+          args: [],
+        },
+      },
+      repairAction: `Run \`skills floating-skill list\` for the full list, then ${FLOATING_SKILL_REPAIR}`,
+      independentObservable:
+        "At least one SKILL.md was found in a scanned user-level skill folder.",
+    }),
+  ],
+  run: (input, context) => {
+    const report = inspectUserSkillFolders(input["--home"]);
+    if (report.findings.length > 0) {
+      const preview = report.findings
+        .slice(0, FLOATING_SKILL_PREVIEW_LIMIT)
+        .map((finding) =>
+          finding.symlinkTarget === null
+            ? finding.path
+            : `${finding.path} -> ${finding.symlinkTarget}`,
+        )
+        .join(", ");
+      const remaining = report.findings.length - FLOATING_SKILL_PREVIEW_LIMIT;
+      const more = remaining > 0 ? `, and ${String(remaining)} more` : "";
+      return context.result(
+        {
+          commandIdentity: "skills.floating-skill.check",
+          causeCode: "DOMAIN_FLOATING_SKILLS",
+        },
+        {
+          message: `[floating-skill] ${String(report.findings.length)} floating skill(s) found: ${preview}${more}; run \`skills floating-skill list\` for the full list. Repair: ${FLOATING_SKILL_REPAIR}`,
+          data: null,
+          effects: noEffects,
+        },
+      );
+    }
+    return context.result(
+      {
+        commandIdentity: "skills.floating-skill.check",
+        causeCode: succeeded,
+      },
+      {
+        message: `No floating skills found across ${String(report.checkedFolders.length)} user-level folders.`,
+        data: report,
+        effects: noEffects,
+      },
+    );
+  },
+});
+
+const floatingSkillList = command({
+  identity: "skills.floating-skill.list",
+  route: ["floating-skill", "list"],
+  summary:
+    "Return the full floating-skill report for user-level skill folders as typed data.",
+  input: floatingSkillInput,
+  capabilities: {},
+  run: (input, context) => {
+    const report = inspectUserSkillFolders(input["--home"]);
+    const message =
+      report.findings.length === 0
+        ? `No floating skills found across ${String(report.checkedFolders.length)} user-level folders.`
+        : `${String(report.findings.length)} floating skill(s) found across ${String(report.checkedFolders.length)} user-level folders.`;
+    return context.result(
+      {
+        commandIdentity: "skills.floating-skill.list",
+        causeCode: succeeded,
+      },
+      {
+        message,
+        data: report,
+        effects: noEffects,
+      },
+    );
+  },
+});
+
 export const skillCauses = causes;
 
-export const commands = [status, list, validate, helloWorldCommand] as const;
+export const commands = [
+  status,
+  list,
+  validate,
+  floatingSkillCheck,
+  floatingSkillList,
+  helloWorldCommand,
+] as const;

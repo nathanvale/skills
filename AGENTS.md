@@ -33,6 +33,8 @@ Every skill in `engineering/`, `experimental/`, or `productivity/` must appear i
 
 Skill-home placement and typed-only markers follow `agent-engineering` ADR 0003 (`docs/adr/0003-where-a-skill-lives.md`).
 
+Repository-local verifier: read [`.agents/skills/verify-delivery-slice/SKILL.md`](.agents/skills/verify-delivery-slice/SKILL.md) (linked at `.claude/skills/verify-delivery-slice`) when changing or qualifying `skills/experimental/delivery-slice`.
+
 ## Portable kernel skill CLIs
 
 Skills that ship an executable `agent-cli-kernel` CLI follow one of two layouts, both covered by `kernelLint`, `tsc`, `bun test`, `fallow`, and `bun run build:skills` (outputting a zero-dependency bundle to `skills/<bucket>/<skill>/dist/cli.mjs`):
