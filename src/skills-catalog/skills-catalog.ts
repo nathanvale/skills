@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 export type SkillBucket =
   | "engineering"
+  | "experimental"
   | "productivity"
   | "in-progress"
   | "misc"
@@ -29,11 +30,13 @@ export type ValidationReport = {
 
 const PROMOTED_BUCKETS: ReadonlySet<string> = new Set([
   "engineering",
+  "experimental",
   "productivity",
 ]);
 
 const KNOWN_BUCKETS: ReadonlyMap<string, SkillBucket> = new Map([
   ["engineering", "engineering"],
+  ["experimental", "experimental"],
   ["productivity", "productivity"],
   ["in-progress", "in-progress"],
   ["misc", "misc"],
