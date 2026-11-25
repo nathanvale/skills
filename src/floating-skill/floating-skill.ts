@@ -3,6 +3,7 @@ import {
   lstatSync,
   readdirSync,
   readlinkSync,
+  realpathSync,
   statSync,
 } from "node:fs";
 import { homedir } from "node:os";
@@ -29,6 +30,7 @@ const USER_SKILL_FOLDERS = [
   ".agents/skills",
   ".codex/skills",
   ".gemini/config/skills",
+  ".pi/agent/skills",
 ] as const;
 
 const SKIPPED_APP_FOLDERS: ReadonlySet<string> = new Set([
@@ -105,15 +107,29 @@ function entryCanContainSkill(
   }
 }
 
-function scanUserSkillFolder(
-  home: string,
-  relativeFolder: string,
-  findings: FloatingSkill[],
+function resolveRealPathOrNull(path: string): string | null {
+  try {
+    return realpathSync(path);
+  } catch (error) {
+    if (isUntraversablePathError(error)) return null;
+    throw error;
+  }
+}
+
+type ScanContext = {
+  readonly rootRelativeFolder: string;
+  readonly visitedRealPaths: Set<string>;
+  readonly findings: FloatingSkill[];
+};
+
+function scanDirectory(
+  context: ScanContext,
+  currentRelativeFolder: string,
+  currentDirPath: string,
 ): void {
-  const folderPath = join(home, relativeFolder);
   let entries: Dirent[];
   try {
-    entries = readdirSync(folderPath, { withFileTypes: true });
+    entries = readdirSync(currentDirPath, { withFileTypes: true });
   } catch (error) {
     if (isUntraversablePathError(error)) return;
     throw error;
@@ -124,21 +140,49 @@ function scanUserSkillFolder(
   );
 
   for (const entry of sorted) {
-    const relativeEntry = `${relativeFolder}/${entry.name}`;
+    const relativeEntry = `${currentRelativeFolder}/${entry.name}`;
     if (SKIPPED_APP_FOLDERS.has(relativeEntry)) continue;
-    const entryPath = join(folderPath, entry.name);
+    const entryPath = join(currentDirPath, entry.name);
     const isSymlink = entry.isSymbolicLink();
     if (!entryCanContainSkill(entryPath, entry.isDirectory(), isSymlink)) {
       continue;
     }
+    const realEntryPath = resolveRealPathOrNull(entryPath);
+    if (realEntryPath === null || context.visitedRealPaths.has(realEntryPath)) {
+      continue;
+    }
+    context.visitedRealPaths.add(realEntryPath);
     const finding = inspectSkillEntry(
-      relativeFolder,
+      context.rootRelativeFolder,
       entryPath,
       entry.name,
       isSymlink,
     );
-    if (finding !== null) findings.push(finding);
+    if (finding !== null) {
+      context.findings.push(finding);
+      continue;
+    }
+    scanDirectory(context, relativeEntry, entryPath);
   }
+}
+
+function scanUserSkillFolder(
+  home: string,
+  relativeFolder: string,
+  findings: FloatingSkill[],
+): void {
+  const folderPath = join(home, relativeFolder);
+  const realFolderPath = resolveRealPathOrNull(folderPath);
+  if (realFolderPath === null) return;
+  scanDirectory(
+    {
+      rootRelativeFolder: relativeFolder,
+      visitedRealPaths: new Set([realFolderPath]),
+      findings,
+    },
+    relativeFolder,
+    folderPath,
+  );
 }
 
 export function inspectUserSkillFolders(
