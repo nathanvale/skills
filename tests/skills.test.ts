@@ -175,15 +175,19 @@ test("copied hello-world skill runs standalone in a sterile folder without node_
       exitCode: discovered.exitCode,
       stderr: discovered.stderr.toString(),
     }).toEqual({ exitCode: 0, stderr: "" });
-    expect(JSON.parse(discovered.stdout.toString())).toMatchObject({
-      contractVersion: "3.0.0",
-      availablePaths: expect.arrayContaining([
+    const discoveredBody: unknown = JSON.parse(discovered.stdout.toString());
+    expect(discoveredBody).toHaveProperty(
+      "availablePaths",
+      expect.arrayContaining([
         "hello-world.command-discovery",
         "hello-world.discovery",
         "hello-world.dispatch",
         "hello-world.greet",
         "hello-world.help",
       ]),
+    );
+    expect(discoveredBody).toMatchObject({
+      contractVersion: "3.0.0",
       result: {
         commandIdentity: "hello-world.discovery",
         causeCode: "SUCCESS_UNCHANGED",
