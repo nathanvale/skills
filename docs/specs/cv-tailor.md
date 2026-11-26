@@ -1,6 +1,8 @@
 # Spec: cv-tailor, a public productivity skill on the CLI kernel
 
-Written against rulebook v49. Owning repository: `nathanvale/skills`. Destination: `docs/specs/cv-tailor.md`. Status: draft for two blind reviews.
+Written against rulebook v49. Owning repository: `nathanvale/skills`. Destination: `docs/specs/cv-tailor.md`.
+
+Status: accepted by the maintainer, 26 November 2026 11:24, option (a).
 
 ## Problem
 
@@ -78,14 +80,14 @@ Look-only work is its own inspect command, never a flag on a changing command (k
 - Keys: `jobHuntingFolder` (read by the skill's steps, which make each role's work folder inside it; no command reads it), `baselineCv` (the `.docx` used as template; its `.pdf` sits beside it), `outputFolder` (default: the source Markdown's folder), `factsFile` (the confirmed-facts file the skill reads for claims), `constraintsFile` (optional: rate, location and contract limits the skill checks the ad against), and `soffice` (path to LibreOffice's program).
 - Order, first hit wins: command option, then environment variable (`CV_TAILOR_JOB_HUNTING_DIR`, `CV_TAILOR_BASELINE_CV`, `CV_TAILOR_OUTPUT_DIR`, `CV_TAILOR_FACTS_FILE`, `CV_TAILOR_CONSTRAINTS_FILE`, `CV_TAILOR_SOFFICE`), then the settings file.
 - Settings file: `CV_TAILOR_SETTINGS_FILE` when absolute, else `xdgBaseFolder(env, "config")` from `agent-cli-kernel/xdg-base` joined with `nathanvale-skills/cv-tailor/settings.json`. It is read with `readRootedFile` from `agent-cli-kernel/rooted-file`, rooted at its own folder, limit 64 KiB; a link, escape or oversize file is refused with a station telling the user to replace it with a regular file.
-- State folder: `CV_TAILOR_STATE_DIR` when absolute (a relative value is refused, as Google Contacts refuses its ledger folder), else `$NATHANVALE_SKILLS_DATA_HOME/cv-tailor/state` when absolute, else the XDG data base joined with `nathanvale-skills/cv-tailor/state`, the same lookup order as the Google Contacts ledger. When no XDG base resolves (HOME unset), a command refuses with the settings station naming `CV_TAILOR_SETTINGS_FILE`.
-- A relative command option resolves against the working folder. An empty or relative environment or settings-file value is ignored. A command that needs a missing key refuses with a station naming the key and the three places to set it.
+- State folder: `CV_TAILOR_STATE_DIR` when absolute (a relative value is refused, as Google Contacts refuses its ledger folder), else `$NATHANVALE_SKILLS_DATA_HOME/cv-tailor/state` when absolute, else the XDG data base joined with `nathanvale-skills/cv-tailor/state`, the same lookup order as the Google Contacts ledger. When an XDG base does not resolve (HOME unset), only a command that reads settings or state refuses, naming the variable for the base that failed (`CV_TAILOR_SETTINGS_FILE` or `CV_TAILOR_STATE_DIR`).
+- A relative command option resolves against the working folder. An empty or relative environment or settings-file value for any of the six settings keys is ignored. A command that needs a missing key refuses with a station naming the key and the three places to set it.
 
 ### The skill
 
 - `SKILL.md` keeps the prototype's six steps (capture the ad, analyse fit, rewrite, screen like a recruiter, blind tests, deliver), rewritten with `writing-for-agents` for any candidate: claims come from the file at `factsFile`, a requirement without evidence is a **Gap**, the user sends every file and message, and the skill drafts only.
 - `references/blind-tests.md` keeps the four blind tests: recruiter old versus new, pairwise style and positioning, hiring-manager follow-ups, and the pile test (eight fictional competitor pages, three runs with the new page, one with the old). Every prompt opens with the reader's role and the read-only-these-files line. Commands in both files name `cv-tailor` routes only.
-- The skill appears in the three manifests (`.claude-plugin/plugin.json`, `plugin.json`, `package.json` `pi.skills`) and in `README.md` and `skills/productivity/README.md`. `tests/skills.test.ts`, which pins the exact skill list and its count, gains `cv-tailor` in its promoted-list assertion and a count of 11 (it asserts 10 today). New domain words (Gap, evidence, pile, synthetic page) go into a skill glossary routed from `GLOSSARY-MAP.md`. A changeset covers the `src/` change.
+- The skill appears in the three manifests (`.claude-plugin/plugin.json`, `plugin.json`, `package.json` `pi.skills`) and in `README.md` and `skills/productivity/README.md`. `tests/skills.test.ts`, which pins the exact skill list and its count, gains `cv-tailor` in its promoted-list assertion; `skillCount` and `skills.length` become 11 and `promotedCount` becomes 10. New domain words (Gap, evidence, pile, synthetic page) go into a skill glossary routed from `GLOSSARY-MAP.md`. A changeset covers the `src/` change.
 
 ### No legacy
 
@@ -96,7 +98,7 @@ Nothing carries the prototype's names forward: no `cv_check`, `make_piles`, `bui
 - Tests drive commands through `runInProcess` on the contract from `createCvTailorCli`, never through internal files, so modules can move. Tests pass fixture-relative paths, so results compare without rewriting.
 - Pure rules (`cv/rules.ts`, `search/rules.ts`, `pile/rules.ts`) get table tests: query precedence, prefix terms, hyphen-or-space, joined line breaks, date lines, and pile positions.
 - `soffice` is a programs add-on call; tests set `CV_TAILOR_SOFFICE` to a stub program that copies a fixed PDF, so `bun run check` never needs LibreOffice. The real conversion is proved by the maintainer check.
-- Checks 2, 3, 4 and 7 need Poppler (`cv build` reports the page count through `pdfinfo`; check 4 extracts PDF text). Where they run is open choice 2; a test never skips silently, it fails with the `doctor` repair.
+- Checks 2, 3, 4 and 7 need Poppler (`cv build` reports the page count through `pdfinfo`; check 4 extracts PDF text), and so does check 9 (`pdfinfo` on the fixtures). Where they run is open choice 2; a test never skips silently, it fails with the `doctor` repair.
 - `tests/skills.test.ts` gains a new test that every promoted skill appears in `README.md` and in its bucket `README.md`; no README test exists today.
 - Prior art: `tests/google-contacts-*.test.ts` for a runtime-factory CLI, its XDG resolution test, and its PII guard.
 
@@ -107,11 +109,10 @@ Committed under `tests/fixtures/cv-tailor/`, written fresh for this repository: 
 - `job-ad.md`: a numbered requirement list with terms the CV proves and terms it does not.
 - `cv.md`: the tailored CV source in the Markdown shape, two pages, with one link that hides its URL (to raise a WARN).
 - `template.docx`: a minimal Word template with the seven styles, its Title style carrying negative character spacing.
-- `old.docx` and `old.pdf`: committed once. A `tests/support` script derives `old.docx` from `expected/cv.docx` by restoring the negative Title `w:spacing` in `word/styles.xml`; no production option exists for it. `old.pdf` is LibreOffice's conversion of it, so it keeps the fault.
 - `new.pdf`: LibreOffice's conversion of `expected/cv.docx`.
-- Every `.docx` has empty author, last-modified-by and company fields (`docProps/core.xml`, `docProps/app.xml`); every PDF has an empty Author, fixed or blank CreationDate and ModDate, and no XMP metadata.
+- Every `.docx` has empty author, last-modified-by and company fields (`docProps/core.xml`, `docProps/app.xml`); every PDF has an empty Author and no private value in its dates or XMP metadata (check 9 scans them; no date-rewriting step).
 - `synthetic/s1.txt` to `s8.txt`: eight fictional competitor first pages.
-- `expected/`: `cv.docx` from `cv build`; word text and PDF text, including `old.pdf`'s raw text; and hand-written JSON of the expected verdicts (found or missing per term, HIT or MISS per query, PASS, FAIL or WARN per check), with paths relative to the fixture folder, confirmed against the new CLI's output.
+- `expected/`: `cv.docx` from `cv build`; word text and PDF text; and hand-written JSON of the expected verdicts (found or missing per term, HIT or MISS per query, PASS, FAIL or WARN per check), with paths relative to the fixture folder, confirmed against the new CLI's output.
 - The Word text golden is captured once by running the prototype's text extraction on `expected/cv.docx`; it is the one prototype-parity golden.
 
 ### Maintainer-only check
@@ -121,10 +122,10 @@ A private worked example the maintainer keeps locally is never committed and nev
 ## Acceptance checks
 
 1. `bun run check` exits 0 on the branch.
-2. `bun run build:skills` writes `skills/productivity/cv-tailor/dist/cli.mjs`; then `bun run check:skills` reports every bundle up to date, and `verify.ts ready`, `sweep` and `drive verify/scenarios/cv-tailor.json` from the kernel's verify-cli skill pass on that bundle. The drive command line sets `CV_TAILOR_STATE_DIR`, `CV_TAILOR_SETTINGS_FILE` and `CV_TAILOR_SOFFICE` under `{scratch}`; the `soffice` stub stays alive past the step's `timeoutMilliseconds` when the input stem holds a marker word, that step expects `timedOut: true`, and a `pending` step follows.
+2. `bun run build:skills` writes `skills/productivity/cv-tailor/dist/cli.mjs`; then `bun run check:skills` reports every bundle up to date, and `verify.ts ready`, `sweep` and `drive verify/scenarios/cv-tailor.json` from the kernel's verify-cli skill pass on that bundle. The drive command line points `CV_TAILOR_SOFFICE` at a committed stub under `tests/support/`, and `CV_TAILOR_STATE_DIR` and `CV_TAILOR_SETTINGS_FILE` at `<run folder>/scratch/...`. When the input stem holds a marker word, the stub sleeps a bounded time past the step's `timeoutMilliseconds`, then exits; the `soffice` call's own timeout exceeds the step timeout; that step expects `timedOut: true`, and a `pending` step follows.
 3. `bun test tests/cv-tailor-build.test.ts`: `cv build` on the synthetic fixture, run twice into two scratch folders, gives two `.docx` files byte-identical to each other and to `expected/cv.docx`.
 4. `bun test tests/cv-tailor-text.test.ts`: `cv text` word output is byte-identical to the prototype-captured golden; PDF layout and raw text match the goldens word for word in order after normalising; the verdicts of `term report`, `search run` and `cv check` equal the expected JSON.
-5. `bun test tests/cv-tailor-check.test.ts`: the name check, fed `old.pdf`'s committed raw text from `expected/`, refuses with exit 3 and the name read as one word in its data, without Poppler; on `new.pdf`'s text it passes.
+5. `bun test tests/cv-tailor-rules.test.ts`: a table test of the pure name rule in `cv/rules.ts`: a title name parses as separate words, and the letter-spacing fault (the name run together) reads as one word. No exit code, no Poppler.
 6. `bun test tests/cv-tailor-pile.test.ts`: `pile make --seed 7` run twice gives byte-identical piles and key; the key sits outside `piles/`; the new page sits at a different position in each of the three new-page piles.
 7. `bun test tests/cv-tailor-settings.test.ts`: `settings show` shows environment over file and ignores empty and relative values; `cv build --template` and `--out` beat both, a relative option resolves against the working folder, and `cv build` with no template set refuses naming `baselineCv`.
 8. `bun test tests/skills.test.ts` passes with `cv-tailor` in the three manifests and the count at 11, and the new README test finds it in `README.md` and `skills/productivity/README.md`.
