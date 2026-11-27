@@ -1,0 +1,30 @@
+Alex Example
+Senior Platform Engineer | TypeScript, Node.js, PostgreSQL, Terraform
+alex@example.com | +61 400 000 000 | Melbourne | Portfolio
+Profile
+Platform engineer with nine years building TypeScript and Node.js services, PostgreSQL data pipelines, and Terraform infrast
+Experience
+Lead Platform Engineer, Northwind Systems
+March 2023 to present | Melbourne
+Designed TypeScript and Node.js billing services processing 120,000 events per hour with PostgreSQL partitioning and Open
+Built repeatable Terraform modules and CI/CD pipelines that cut environment provisioning from two days to 18 minutes.
+Mentored six engineers through weekly architecture reviews and structured pairing sessions.
+Replaced brittle manual smoke scripts with automated integration tests covering every public API contract.
+Senior Software Engineer, Harborline Logistics
+February 2020 to February 2023 | Melbourne
+Built event-driven shipment tracking pipelines in TypeScript and PostgreSQL handling peak seasonal traffic with zero message
+Migrated legacy batch jobs into containerized Node.js workers with structured logging and automated rollback checks.
+Reduced p95 query latency by 42 percent by redesigning composite indexes and connection pooling.
+Software Engineer, Brightleaf Financial
+January 2018 to January 2020 | Melbourne
+Implemented customer onboarding APIs in Node.js with strict schema validation and end-to-end test coverage.
+Maintained PostgreSQL reporting views and automated nightly schema drift checks.
+Skills
+Languages and runtime: TypeScript, Node.js, SQL, Bash
+Data and observability: PostgreSQL, event-driven pipelines, OpenTelemetry
+Delivery and infrastructure: Terraform, CI/CD, automated integration tests, Linux
+Education
+Bachelor of Computer Science, Southern Cross Institute
+February 2014 to November 2017 | Melbourne
+Completed honours project on deterministic build systems and reproducible packaging.
+

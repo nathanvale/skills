@@ -1,0 +1,12 @@
+Taylor Brooks
+Principal Backend Engineer | Node.js, PostgreSQL, AWS, Terraform
+Melbourne | taylor.brooks@example.org
+
+Profile
+Backend specialist with eight years shipping event-driven Node.js services, high-throughput PostgreSQL systems, and CI/CD automation.
+
+Experience
+Principal Engineer, Cobalt Retail (April 2021 to present)
+- Architected TypeScript and PostgreSQL order pipelines handling 250,000 events per hour.
+- Standardized Terraform stacks and automated integration test suites across 15 repositories.
+- Led architecture reviews and mentoring for a team of seven engineers.

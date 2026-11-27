@@ -1,0 +1,219 @@
+{
+  "schema": "verify-scenario/1",
+  "feature": "cv-tailor",
+  "steps": [
+    {
+      "name": "doctor-ready",
+      "argv": ["doctor", "--json"],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "cv-tailor.doctor",
+          "causeCode": "SUCCESS_UNCHANGED",
+          "data.ready": true
+        }
+      }
+    },
+    {
+      "name": "settings-show",
+      "argv": ["settings", "show", "--json"],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "cv-tailor.settings-show",
+          "causeCode": "SUCCESS_UNCHANGED"
+        }
+      }
+    },
+    {
+      "name": "pending-empty",
+      "argv": ["pending", "--json"],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "cv-tailor.pending",
+          "causeCode": "SUCCESS_UNCHANGED",
+          "data.unfinished.length": 0
+        }
+      }
+    },
+    {
+      "name": "cv-text-docx",
+      "argv": [
+        "cv",
+        "text",
+        "{repository}/tests/fixtures/cv-tailor/expected/cv.docx",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "cv-tailor.cv-text",
+          "causeCode": "SUCCESS_UNCHANGED",
+          "data.format": "docx"
+        }
+      }
+    },
+    {
+      "name": "term-report",
+      "argv": [
+        "term",
+        "report",
+        "--file",
+        "{repository}/tests/fixtures/cv-tailor/new.pdf",
+        "--term",
+        "TypeScript",
+        "--term",
+        "Kubernetes",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "cv-tailor.term-report",
+          "causeCode": "SUCCESS_UNCHANGED",
+          "data.files.0.foundCount": 1,
+          "data.files.0.totalCount": 2
+        }
+      }
+    },
+    {
+      "name": "search-run",
+      "argv": [
+        "search",
+        "run",
+        "--file",
+        "{repository}/tests/fixtures/cv-tailor/new.pdf",
+        "--query",
+        "TypeScript AND PostgreSQL",
+        "--query",
+        "TypeScript AND Kubernetes",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "cv-tailor.search-run",
+          "causeCode": "SUCCESS_UNCHANGED",
+          "data.files.0.results.0.verdict": "HIT",
+          "data.files.0.results.1.verdict": "MISS"
+        }
+      }
+    },
+    {
+      "name": "cv-check-pass",
+      "argv": [
+        "cv",
+        "check",
+        "--pdf",
+        "{repository}/tests/fixtures/cv-tailor/new.pdf",
+        "--docx",
+        "{repository}/tests/fixtures/cv-tailor/expected/cv.docx",
+        "--source",
+        "{repository}/tests/fixtures/cv-tailor/cv.md",
+        "--term",
+        "TypeScript",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "cv-tailor.cv-check",
+          "causeCode": "SUCCESS_UNCHANGED",
+          "data.verdict": "PASS",
+          "data.failures": 0
+        }
+      }
+    },
+    {
+      "name": "cv-check-fail-carries-data",
+      "argv": [
+        "cv",
+        "check",
+        "--pdf",
+        "{repository}/tests/fixtures/cv-tailor/new.pdf",
+        "--docx",
+        "{repository}/tests/fixtures/cv-tailor/expected/cv.docx",
+        "--source",
+        "{repository}/tests/fixtures/cv-tailor/cv.md",
+        "--term",
+        "Kubernetes",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 3,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "cv-tailor.cv-check",
+          "causeCode": "DOMAIN_CV_TAILOR_CHECK_FAILED",
+          "data.verdict": "FAIL",
+          "data.failures": 2
+        }
+      }
+    },
+    {
+      "name": "cv-build-first",
+      "argv": [
+        "cv",
+        "build",
+        "{repository}/tests/fixtures/cv-tailor/cv.md",
+        "--template",
+        "{repository}/tests/fixtures/cv-tailor/template.docx",
+        "--out",
+        "{scratch}/out",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "cv-tailor.cv-build",
+          "causeCode": "SUCCESS_COMPLETED",
+          "transactionState": "completed",
+          "data.pages": 2
+        }
+      }
+    },
+    {
+      "name": "cv-build-interrupted",
+      "timeoutMilliseconds": 2500,
+      "argv": [
+        "cv",
+        "build",
+        "{repository}/tests/fixtures/cv-tailor/hang-marker.md",
+        "--template",
+        "{repository}/tests/fixtures/cv-tailor/template.docx",
+        "--out",
+        "{scratch}/out-hang",
+        "--json"
+      ],
+      "expect": {
+        "exitCode": 143,
+        "timedOut": true,
+        "stdout": "",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "pending-lists-interrupted-build",
+      "argv": ["pending", "--json"],
+      "expect": {
+        "exitCode": 0,
+        "stderr": "",
+        "result": {
+          "commandIdentity": "cv-tailor.pending",
+          "causeCode": "SUCCESS_UNCHANGED",
+          "data.unfinished.length": 1,
+          "data.unfinished.0.commandIdentity": "cv-tailor.cv-build"
+        }
+      }
+    }
+  ]
+}

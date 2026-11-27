@@ -1,0 +1,84 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 7 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 7 0 R >> >> /Contents 6 0 R >>
+endobj
+5 0 obj
+<< /Length 1531 >>
+stream
+BT
+/F1 10 Tf
+40 790 Td
+14 TL
+(Alex Example) Tj
+T* (Senior Platform Engineer | TypeScript, Node.js, PostgreSQL, Terraform) Tj
+T* (alex@example.com | +61 400 000 000 | Melbourne | Portfolio) Tj
+T* (Profile) Tj
+T* (Platform engineer with nine years building TypeScript and Node.js services, PostgreSQL data pipelines, and Terraform infrastructure. Focuses on observable systems, automated testing, and mentoring engineers through clear design reviews.) Tj
+T* (Experience) Tj
+T* (Lead Platform Engineer, Northwind Systems) Tj
+T* (March 2023 to present | Melbourne) Tj
+T* (Designed TypeScript and Node.js billing services processing 120,000 events per hour with PostgreSQL partitioning and OpenTelemetry tracing.) Tj
+T* (Built repeatable Terraform modules and CI/CD pipelines that cut environment provisioning from two days to 18 minutes.) Tj
+T* (Mentored six engineers through weekly architecture reviews and structured pairing sessions.) Tj
+T* (Replaced brittle manual smoke scripts with automated integration tests covering every public API contract.) Tj
+T* (Senior Software Engineer, Harborline Logistics) Tj
+T* (February 2020 to February 2023 | Melbourne) Tj
+T* (Built event-driven shipment tracking pipelines in TypeScript and PostgreSQL handling peak seasonal traffic with zero message loss.) Tj
+T* (Migrated legacy batch jobs into containerized Node.js workers with structured logging and automated rollback checks.) Tj
+T* (Reduced p95 query latency by 42 percent by redesigning composite indexes and connection pooling.) Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Length 805 >>
+stream
+BT
+/F1 10 Tf
+40 790 Td
+14 TL
+(Software Engineer, Brightleaf Financial) Tj
+T* (January 2018 to January 2020 | Melbourne) Tj
+T* (Implemented customer onboarding APIs in Node.js with strict schema validation and end-to-end test coverage.) Tj
+T* (Maintained PostgreSQL reporting views and automated nightly schema drift checks.) Tj
+T* (Skills) Tj
+T* (Languages and runtime: TypeScript, Node.js, SQL, Bash) Tj
+T* (Data and observability: PostgreSQL, event-driven pipelines, OpenTelemetry) Tj
+T* (Delivery and infrastructure: Terraform, CI/CD, automated integration tests, Linux) Tj
+T* (Education) Tj
+T* (Bachelor of Computer Science, Southern Cross Institute) Tj
+T* (February 2014 to November 2017 | Melbourne) Tj
+T* (Completed honours project on deterministic build systems and reproducible packaging.) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+8 0 obj
+<< /Title (Alex Example CV) /Author () >>
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000373 00000 n 
+0000001955 00000 n 
+0000002810 00000 n 
+0000002880 00000 n 
+trailer
+<< /Size 9 /Root 1 0 R /Info 8 0 R >>
+startxref
+2937
+%%EOF

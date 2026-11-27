@@ -14,6 +14,7 @@
       "./skills/engineering/xdg",
       "./skills/experimental/delivery-slice",
       "./skills/experimental/test-runner",
+      "./skills/productivity/cv-tailor",
       "./skills/productivity/imessage-reader",
       "./skills/productivity/linear-intake"
     ],
@@ -24,7 +25,8 @@
   "bundles": {
     "hooks/coordinator/dist/compaction-reground.mjs": "src/compaction-reground/compaction-reground.ts",
     "skills/engineering/hello-world/dist/cli.mjs": "src/skill-clis/hello-world-main.ts",
-    "skills/in-progress/google-contacts/dist/cli.mjs": "src/google-contacts/main.ts"
+    "skills/in-progress/google-contacts/dist/cli.mjs": "src/google-contacts/main.ts",
+    "skills/productivity/cv-tailor/dist/cli.mjs": "src/cv-tailor/main.ts"
   },
   "scripts": {
     "start": "bun run src/cli.ts",

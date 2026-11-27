@@ -14,6 +14,7 @@
     "tests/cli.test.ts",
     "tests/skills.test.ts",
     "src/compaction-reground/compaction-reground.ts",
+    "src/cv-tailor/main.ts",
     "src/google-contacts/main.ts",
     "src/skill-clis/hello-world-main.ts",
     "skills/engineering/test-design/evals/smoke-definitions.ts"

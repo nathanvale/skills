@@ -4,6 +4,7 @@
 
 - [Skills plugin](./GLOSSARY.md): Claude Code coordinator session hooks and shared coordination state
 - [Google Contacts](./skills/in-progress/google-contacts/GLOSSARY.md): address book auditing, evidence-backed enrichment, duplicate merging, and safe mutation planning for Google Contacts
+- [CV Tailor](./skills/productivity/cv-tailor/GLOSSARY.md): evidence-backed CV tailoring, Gap tracking, recruiter Boolean screening, and blind Pile testing with Synthetic pages
 
 ## Relationships
 
