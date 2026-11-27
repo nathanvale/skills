@@ -1,5 +1,11 @@
 import { expect, test } from "bun:test";
-import { rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { createCvTailorRunner } from "./support/cv-tailor-run.ts";
 import { testFolder } from "./support/test-folder.ts";
@@ -161,9 +167,17 @@ test("cv build options beat env and file, resolve relative options against cwd, 
 test("doctor reports missing soffice with repair and succeeds when CV_TAILOR_SOFFICE is set", async () => {
   const scratch = testFolder("cv-tailor-doctor-");
   try {
+    const controlledBin = join(scratch, "bin");
+    mkdirSync(controlledBin, { recursive: true });
+    for (const program of ["pdftotext", "pdfinfo"]) {
+      const stubPath = join(controlledBin, program);
+      writeFileSync(stubPath, "#!/bin/sh\nexit 0\n", "utf8");
+      chmodSync(stubPath, 0o755);
+    }
+
     const missingRun = createCvTailorRunner({
       env: {
-        PATH: process.env.PATH,
+        PATH: controlledBin,
         CV_TAILOR_SETTINGS_FILE: join(scratch, "absent.json"),
         CV_TAILOR_STATE_DIR: join(scratch, "state"),
       },
@@ -179,7 +193,7 @@ test("doctor reports missing soffice with repair and succeeds when CV_TAILOR_SOF
 
     const readyRun = createCvTailorRunner({
       env: {
-        PATH: process.env.PATH,
+        PATH: controlledBin,
         CV_TAILOR_SETTINGS_FILE: join(scratch, "absent.json"),
         CV_TAILOR_STATE_DIR: join(scratch, "state"),
         CV_TAILOR_SOFFICE: sofficeStub,
