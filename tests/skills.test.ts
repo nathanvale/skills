@@ -16,7 +16,11 @@ import {
   repositoryRoot,
   validateSkillsRepository,
 } from "../src/skills-catalog/skills-catalog.ts";
-import { withCatalogCopy } from "./support/catalog-copy.ts";
+import {
+  missingPromotedReadmeLinks,
+  plantedCodexPolicies,
+  withCatalogCopy,
+} from "./support/catalog-copy.ts";
 import { testFolder } from "./support/test-folder.ts";
 
 const repoCli = join(repositoryRoot(), "src", "cli.ts");
@@ -89,6 +93,13 @@ test("front-door CLI lists promoted skills, validates manifests, and runs greet"
               portableCli: null,
             },
             {
+              name: "cv-tailor",
+              bucket: "productivity",
+              invocation: "model-invoked",
+              promoted: true,
+              portableCli: "skills/productivity/cv-tailor/dist/cli.mjs",
+            },
+            {
               name: "imessage-reader",
               bucket: "productivity",
               invocation: "user-invoked",
@@ -119,7 +130,7 @@ test("front-door CLI lists promoted skills, validates manifests, and runs greet"
       result: {
         commandIdentity: "skills.validate",
         causeCode: "SUCCESS_UNCHANGED",
-        data: { valid: true, skillCount: 10, promotedCount: 9, issues: [] },
+        data: { valid: true, skillCount: 11, promotedCount: 10, issues: [] },
       },
     });
 
@@ -239,7 +250,7 @@ test("copied hello-world skill runs standalone in a sterile folder without node_
 test("portable skill CLI bundles match fresh builds and repository catalogs stay valid", () => {
   expect(helloWorldContract.cli).toBe("hello-world");
   const skills = discoverSkills();
-  expect(skills.length).toBe(10);
+  expect(skills.length).toBe(11);
   expect(skills.find((item) => item.name === "google-contacts")).toMatchObject({
     name: "google-contacts",
     bucket: "in-progress",
@@ -319,25 +330,8 @@ test("validate accepts a user-only skill only when Codex reads allow_implicit_in
     );
     const refusal =
       '[typed-drift] skills/engineering/hello-world: disable-model-invocation is true but Codex ignores it. Repair: add agents/openai.yaml with "policy:" and "  allow_implicit_invocation: false". See agent-engineering ADR 0003.';
-    const plantedPolicies: Readonly<Record<string, string>> = {
-      "key at top level": "allow_implicit_invocation: false\n",
-      "key under interface while policy says true":
-        "interface:\n  allow_implicit_invocation: false\npolicy:\n  allow_implicit_invocation: true\n",
-      "policy nested under another parent":
-        "interface:\n  policy:\n    allow_implicit_invocation: false\n",
-      "text inside a block scalar while policy says true":
-        "interface:\n  default_prompt: |\n    allow_implicit_invocation: false\npolicy:\n  allow_implicit_invocation: true\n",
-      "text only inside a block scalar":
-        "interface:\n  default_prompt: |\n    allow_implicit_invocation: false\n",
-      "text only inside a comment":
-        "policy:\n  # allow_implicit_invocation: false\n",
-      "quoted string false": 'policy:\n  allow_implicit_invocation: "false"\n',
-      "broken YAML": "policy:\n  allow_implicit_invocation: [false\n",
-      "trailing comment after false":
-        "policy:\n  allow_implicit_invocation: false # manual only\n",
-    };
     const outcomes: Record<string, readonly string[]> = {};
-    for (const [label, contents] of Object.entries(plantedPolicies)) {
+    for (const [label, contents] of Object.entries(plantedCodexPolicies)) {
       writeFileSync(policyFile, contents);
       outcomes[label] = issuesOrThrownError(copy);
     }
@@ -489,4 +483,8 @@ test("xdg skill is thin, model-invoked, backed by sources.md, and uses a single-
     expect(parsedDescription).not.toContain("\n");
     expect(entry?.description).toBe(parsedDescription);
   }
+});
+
+test("every promoted skill appears in README.md and in its bucket README.md", () => {
+  expect(missingPromotedReadmeLinks(repositoryRoot())).toEqual([]);
 });
