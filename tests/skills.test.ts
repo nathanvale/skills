@@ -10,11 +10,6 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import {
-  buildSkillClis,
-  renderSkillCliBundle,
-  SKILL_CLIS,
-} from "../scripts/build-skill-clis.ts";
 import { helloWorldContract } from "../src/skill-clis/hello-world.ts";
 import {
   discoverSkills,
@@ -241,7 +236,7 @@ test("copied hello-world skill runs standalone in a sterile folder without node_
   }
 });
 
-test("portable skill CLI bundles match fresh builds and repository catalogs stay valid", async () => {
+test("portable skill CLI bundles match fresh builds and repository catalogs stay valid", () => {
   expect(helloWorldContract.cli).toBe("hello-world");
   const skills = discoverSkills();
   expect(skills.length).toBe(10);
@@ -254,23 +249,37 @@ test("portable skill CLI bundles match fresh builds and repository catalogs stay
   });
   expect(validateSkillsRepository().valid).toBe(true);
 
-  const checked = await buildSkillClis({ check: true });
-  expect(checked.length).toBe(SKILL_CLIS.length);
-  for (const item of checked) {
-    expect(item.upToDate).toBe(true);
-    expect(item.bytes).toBeGreaterThan(0);
+  const manifest: unknown = JSON.parse(
+    readFileSync(join(repositoryRoot(), "package.json"), "utf8"),
+  );
+  const bundlesField: unknown =
+    typeof manifest === "object" && manifest !== null
+      ? Reflect.get(manifest, "bundles")
+      : undefined;
+  expect(typeof bundlesField === "object" && bundlesField !== null).toBe(true);
+  const bundleOutputs =
+    typeof bundlesField === "object" && bundlesField !== null
+      ? Object.keys(bundlesField)
+      : [];
+  expect(bundleOutputs.length).toBeGreaterThan(0);
+  for (const outputFile of bundleOutputs) {
+    const fullPath = join(repositoryRoot(), outputFile);
+    expect(existsSync(fullPath)).toBe(true);
+    expect(readFileSync(fullPath, "utf8").length).toBeGreaterThan(0);
   }
 
-  const firstSpec = SKILL_CLIS[0];
-  expect(firstSpec).toBeDefined();
-  if (firstSpec !== undefined) {
-    const rendered = await renderSkillCliBundle(firstSpec);
-    const committed = readFileSync(
-      join(repositoryRoot(), firstSpec.outputFile),
-      "utf8",
-    );
-    expect(committed).toBe(rendered);
-  }
+  const checked = Bun.spawnSync(
+    [process.execPath, "run", "--silent", "check:bundles"],
+    {
+      cwd: repositoryRoot(),
+      stdout: "pipe",
+      stderr: "pipe",
+    },
+  );
+  expect({
+    exitCode: checked.exitCode,
+    stderr: checked.stderr.toString(),
+  }).toEqual({ exitCode: 0, stderr: "" });
 });
 
 function issuesOrThrownError(root: string): readonly string[] {

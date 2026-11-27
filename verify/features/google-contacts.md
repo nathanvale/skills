@@ -20,7 +20,7 @@ The compiled zero-`node_modules` bundle at `skills/in-progress/google-contacts/d
 
 ## Driving it with verify-cli
 
-Preconditions: `bun run build:skills` has produced an up-to-date `skills/in-progress/google-contacts/dist/cli.mjs`, `verify.ts ready` exits `0`, and `verify.ts launch <run-folder> skills/in-progress/google-contacts/dist/cli.mjs` has created `<run-folder>/scratch/`.
+Preconditions: `bun run build:bundles` has produced an up-to-date `skills/in-progress/google-contacts/dist/cli.mjs`, `verify.ts ready` exits `0`, and `verify.ts launch <run-folder> skills/in-progress/google-contacts/dist/cli.mjs` has created `<run-folder>/scratch/`.
 
 ```text
 bun node_modules/agent-cli-kernel/skills/verify-cli/verify.ts ready skills/in-progress/google-contacts/dist/cli.mjs

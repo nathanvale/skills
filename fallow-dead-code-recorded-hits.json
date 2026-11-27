@@ -48,9 +48,7 @@
   "test_only_dependencies": [],
   "dev_dependencies_in_production": [],
   "boundary_violations": [],
-  "boundary_coverage_violations": [
-    "boundary-coverage:scripts/build-skill-clis.ts"
-  ],
+  "boundary_coverage_violations": [],
   "boundary_call_violations": [],
   "policy_violations": [],
   "stale_suppressions": [],

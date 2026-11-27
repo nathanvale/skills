@@ -4,7 +4,7 @@ Reusable agent skills built on `bun-typescript-template` and `agent-cli-kernel`.
 
 - **`src/` front-door CLI:** one repo-root `agent-cli-kernel` application CLI (`src/cli.ts`) for listing, validating, and running skill commands.
 - **Nested `skills/` buckets:** Matt Pocock-style category folders (`skills/engineering/`, `skills/experimental/`, `skills/productivity/`, `skills/in-progress/`) with `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, and root `plugin.json`.
-- **Portable kernel-backed skills:** skills that need deterministic execution keep their TypeScript source under `src/skill-clis/` and ship a zero-`node_modules`, cross-platform `dist/cli.mjs` bundle built with `bun run build:skills`.
+- **Portable kernel-backed skills:** skills that need deterministic execution keep their TypeScript source under `src/skill-clis/` and ship a zero-`node_modules`, cross-platform `dist/cli.mjs` bundle built with `bun run build:bundles`.
 
 ## Quick start
 
@@ -124,5 +124,5 @@ The hook needs `bun` on `PATH`. Without it, the hook does nothing. The hook look
 ## Adding a skill with a portable kernel CLI
 
 1. Put the skill's `agent-cli-kernel` command and contract in `src/skill-clis/<skill>.ts` and export the command into `src/commands.ts` so the front-door CLI exposes it too.
-2. Add the skill spec to `SKILL_CLIS` in `scripts/build-skill-clis.ts` and run `bun run build:skills` to emit `skills/<bucket>/<skill>/dist/cli.mjs`.
+2. Add an entry file (for example `src/skill-clis/<skill>-main.ts`), list `"skills/<bucket>/<skill>/dist/cli.mjs"` in `package.json` `bundles` (and the entry in `.fallowrc.json` `"entry"`), and run `bun run build:bundles`.
 3. Add `skills/<bucket>/<skill>/SKILL.md`, register promoted skills in `.claude-plugin/plugin.json` and `plugin.json`, and run `bun run check`.

@@ -21,12 +21,17 @@
     "prompts": [],
     "themes": []
   },
+  "bundles": {
+    "hooks/coordinator/dist/compaction-reground.mjs": "src/compaction-reground/compaction-reground.ts",
+    "skills/engineering/hello-world/dist/cli.mjs": "src/skill-clis/hello-world-main.ts",
+    "skills/in-progress/google-contacts/dist/cli.mjs": "src/google-contacts/main.ts"
+  },
   "scripts": {
     "start": "bun run src/cli.ts",
-    "regenerate": "bun run build:skills",
-    "build:skills": "bun run scripts/build-skill-clis.ts",
-    "check:skills": "bun run scripts/build-skill-clis.ts --check",
-    "check": "bun run check:skills && bun run lint && bun run format:check && bun run typecheck && bun run test && bun run --silent quality:fallow",
+    "regenerate": "bun run build:bundles",
+    "check": "bun run check:bundles && bun run lint && bun run format:check && bun run typecheck && bun run test && bun run --silent quality:fallow",
+    "build:bundles": "bun scripts/build-bundles.ts",
+    "check:bundles": "bun scripts/build-bundles.ts --check",
     "check:changesets": "bun run --bun changeset status --since origin/main && bun scripts/check-gated-paths.ts",
     "check:recorded-health-sizes": "bun scripts/check-recorded-health-sizes.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
