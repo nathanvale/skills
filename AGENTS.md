@@ -4,7 +4,7 @@ Use the existing repository CLI at `src/cli.ts`. Add commands through `src/comma
 Keep domain implementation in separate files and preserve one public application CLI.
 
 Check command: `bun run check`
-Build portable skill CLIs: `bun run build:skills`
+Build portable skill CLIs and bundles: `bun run build:bundles`
 Smoke: `bun run start -- --help`
 Source packet: `https://github.com/nathanvale/skills`
 
@@ -36,10 +36,10 @@ Repository-local verifier: read [`.agents/skills/verify-delivery-slice/SKILL.md`
 
 ## Portable kernel skill CLIs
 
-Skills that ship an executable `agent-cli-kernel` CLI follow one of two layouts, both covered by `kernelLint`, `tsc`, `bun test`, `fallow`, and `bun run build:skills` (outputting a zero-dependency bundle to `skills/<bucket>/<skill>/dist/cli.mjs`):
+Skills that ship an executable `agent-cli-kernel` CLI follow one of two layouts, both covered by `kernelLint`, `tsc`, `bun test`, `fallow`, and `bun run build:bundles` (outputting a zero-dependency bundle to `skills/<bucket>/<skill>/dist/cli.mjs`):
 
-- **Single-file stateless skill CLI:** keeps its contract in `src/skill-clis/<skill>.ts`, registers on the stateless front-door CLI in `src/commands.ts`, and builds with `kind: "contract"` (the default) in `scripts/build-skill-clis.ts`.
-- **Multi-module or stateful standalone skill CLI (uses `state` or `programs` add-ons):** keeps its modules under `src/<skill>/` (placing pure domain rules in `src/<skill>/<area>/rules.ts`), exports a `{ contract, setup }` runtime factory from `src/<skill>/cli.ts` listed in `.fallowrc.json` `"entry"`, builds with `kind: "runtime-factory"` in `scripts/build-skill-clis.ts`, and stays off the stateless front-door `src/commands.ts`. Verify standalone bundles directly with `verify-cli` (`ready`, `sweep`, and `drive`).
+- **Single-file stateless skill CLI:** keeps its contract in `src/skill-clis/<skill>.ts`, registers on the stateless front-door CLI in `src/commands.ts`, and adds an entry file `src/skill-clis/<skill>-main.ts` listed in `package.json` `bundles` and `.fallowrc.json` `"entry"`.
+- **Multi-module or stateful standalone skill CLI (uses `state` or `programs` add-ons):** keeps its modules under `src/<skill>/` (placing pure domain rules in `src/<skill>/<area>/rules.ts`), exports a `{ contract, setup }` runtime factory from `src/<skill>/cli.ts`, adds an entry file `src/<skill>/main.ts` listed in `package.json` `bundles` and `.fallowrc.json` `"entry"`, and stays off the stateless front-door `src/commands.ts`. Verify standalone bundles directly with `verify-cli` (`ready`, `sweep`, and `drive`).
 
 ## Comments
 
