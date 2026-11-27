@@ -14,6 +14,29 @@ const REQUIRED_DOCX_STYLES = [
 
 type RequiredStyleName = (typeof REQUIRED_DOCX_STYLES)[number];
 
+const WORD_BUILTIN_UI_NAMES: ReadonlyMap<string, string> = new Map([
+  ["heading 1", "Heading 1"],
+  ["heading 2", "Heading 2"],
+  ["heading 3", "Heading 3"],
+  ["heading 4", "Heading 4"],
+  ["heading 5", "Heading 5"],
+  ["heading 6", "Heading 6"],
+  ["heading 7", "Heading 7"],
+  ["heading 8", "Heading 8"],
+  ["heading 9", "Heading 9"],
+  ["title", "Title"],
+  ["subtitle", "Subtitle"],
+  ["list bullet", "List Bullet"],
+  ["normal", "Normal"],
+]);
+
+function mapWordStyleNameToUi(
+  styleName: string | undefined,
+): string | undefined {
+  if (styleName === undefined) return undefined;
+  return WORD_BUILTIN_UI_NAMES.get(styleName) ?? styleName;
+}
+
 export type BuildDocxResult =
   | { readonly ok: true; readonly bytes: Uint8Array }
   | { readonly ok: false; readonly error: string };
@@ -54,9 +77,10 @@ function recordStyleMatches(
   styleName: string | undefined,
   found: Map<RequiredStyleName, string>,
 ): void {
+  const uiName = mapWordStyleNameToUi(styleName);
   for (const req of REQUIRED_DOCX_STYLES) {
     if (found.has(req)) continue;
-    if (req === styleName || req === styleId) {
+    if (req === uiName || req === styleId) {
       found.set(req, styleId);
     }
   }
