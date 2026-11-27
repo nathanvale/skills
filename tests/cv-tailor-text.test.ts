@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { writeStoredZip } from "../src/cv-tailor/docx/zip.ts";
 import { normalise } from "../src/cv-tailor/search/rules.ts";
 import { createCvTailorRunner } from "./support/cv-tailor-run.ts";
 import { testFolder } from "./support/test-folder.ts";
@@ -204,6 +205,169 @@ test("term report, search run, and cv check verdicts equal expected JSON", async
       exitCode: 3,
       causeCode: "DOMAIN_CV_TAILOR_CHECK_FAILED",
     });
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test("Word text commands refuse invalid or non-Word document.xml with DOMAIN_CV_TAILOR_FILE_UNREADABLE and accept valid docx", async () => {
+  const scratch = testFolder("cv-tailor-invalid-docx-");
+  try {
+    const encoder = new TextEncoder();
+    const nonXmlDocx = join(scratch, "non-xml.docx");
+    writeFileSync(
+      nonXmlDocx,
+      writeStoredZip([
+        {
+          name: "word/document.xml",
+          data: encoder.encode("not xml at all <<< >>>"),
+          externalAttributes: 0,
+        },
+      ]),
+    );
+
+    const wrongRootDocx = join(scratch, "wrong-root.docx");
+    writeFileSync(
+      wrongRootDocx,
+      writeStoredZip([
+        {
+          name: "word/document.xml",
+          data: encoder.encode(
+            '<?xml version="1.0" encoding="UTF-8"?><root><p>not a word document</p></root>',
+          ),
+          externalAttributes: 0,
+        },
+      ]),
+    );
+
+    const missingBodyDocx = join(scratch, "missing-body.docx");
+    writeFileSync(
+      missingBodyDocx,
+      writeStoredZip([
+        {
+          name: "word/document.xml",
+          data: encoder.encode(
+            '<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:other/></w:document>',
+          ),
+          externalAttributes: 0,
+        },
+      ]),
+    );
+
+    const missingEntryDocx = join(scratch, "missing-document-xml.docx");
+    writeFileSync(
+      missingEntryDocx,
+      writeStoredZip([
+        {
+          name: "word/styles.xml",
+          data: encoder.encode(
+            '<?xml version="1.0" encoding="UTF-8"?><w:styles/>',
+          ),
+          externalAttributes: 0,
+        },
+      ]),
+    );
+
+    const commands: readonly {
+      readonly label: string;
+      readonly argvFor: (docxPath: string) => readonly string[];
+    }[] = [
+      {
+        label: "cv text",
+        argvFor: (docxPath) => ["cv", "text", docxPath],
+      },
+      {
+        label: "term report",
+        argvFor: (docxPath) => [
+          "term",
+          "report",
+          "--file",
+          docxPath,
+          "--term",
+          "TypeScript",
+        ],
+      },
+      {
+        label: "search run",
+        argvFor: (docxPath) => [
+          "search",
+          "run",
+          "--file",
+          docxPath,
+          "--query",
+          "TypeScript",
+        ],
+      },
+      {
+        label: "cv check",
+        argvFor: (docxPath) => [
+          "cv",
+          "check",
+          "--pdf",
+          "new.pdf",
+          "--docx",
+          docxPath,
+          "--source",
+          "cv.md",
+        ],
+      },
+    ];
+
+    const fixtures: readonly {
+      readonly label: string;
+      readonly path: string;
+      readonly expectedExitCode: number;
+      readonly expectedCauseCode: string;
+    }[] = [
+      {
+        label: "non-XML word/document.xml",
+        path: nonXmlDocx,
+        expectedExitCode: 3,
+        expectedCauseCode: "DOMAIN_CV_TAILOR_FILE_UNREADABLE",
+      },
+      {
+        label: "XML without w:document root",
+        path: wrongRootDocx,
+        expectedExitCode: 3,
+        expectedCauseCode: "DOMAIN_CV_TAILOR_FILE_UNREADABLE",
+      },
+      {
+        label: "w:document without w:body child",
+        path: missingBodyDocx,
+        expectedExitCode: 3,
+        expectedCauseCode: "DOMAIN_CV_TAILOR_FILE_UNREADABLE",
+      },
+      {
+        label: "archive missing word/document.xml",
+        path: missingEntryDocx,
+        expectedExitCode: 3,
+        expectedCauseCode: "DOMAIN_CV_TAILOR_FILE_UNREADABLE",
+      },
+      {
+        label: "valid fixture expected/cv.docx",
+        path: "expected/cv.docx",
+        expectedExitCode: 0,
+        expectedCauseCode: "SUCCESS_UNCHANGED",
+      },
+    ];
+
+    const run = createRunner(scratch);
+    for (const commandCase of commands) {
+      for (const fixture of fixtures) {
+        const res = await run(commandCase.argvFor(fixture.path));
+        expect({
+          command: commandCase.label,
+          fixture: fixture.label,
+          exitCode: res.exitCode,
+          causeCode: res.result.causeCode,
+        }).toEqual({
+          command: commandCase.label,
+          fixture: fixture.label,
+          exitCode: fixture.expectedExitCode,
+          causeCode: fixture.expectedCauseCode,
+        });
+      }
+    }
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }

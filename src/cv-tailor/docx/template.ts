@@ -316,6 +316,54 @@ export function buildDocxFromTemplate(
   return { ok: true, bytes: writeStoredZip(nextEntries) };
 }
 
+function extractDocumentBodyXml(
+  xml: string,
+):
+  | { readonly ok: true; readonly bodyXml: string }
+  | { readonly ok: false; readonly error: string } {
+  const trimmed = xml
+    .replace(/^\uFEFF/, "")
+    .replace(/^(?:\s|<!--[\s\S]*?-->|<\?[\s\S]*?\?>)+/, "")
+    .replace(/(?:\s|<!--[\s\S]*?-->)+$/, "");
+  const rootOpen = /^<w:document(?:\s[^>]*)?>/.exec(trimmed);
+  if (rootOpen === null || !trimmed.endsWith("</w:document>")) {
+    return {
+      ok: false,
+      error: "word/document.xml must have a <w:document> root element",
+    };
+  }
+  const docInner = trimmed.slice(
+    rootOpen[0].length,
+    trimmed.length - "</w:document>".length,
+  );
+  if (docInner.includes("</w:document>")) {
+    return {
+      ok: false,
+      error: "word/document.xml must have a single <w:document> root element",
+    };
+  }
+  const selfClosingBody = /<w:body(?:\s[^>]*)?\/>/.exec(docInner);
+  if (selfClosingBody !== null) {
+    return { ok: true, bodyXml: "" };
+  }
+  const bodyOpen = /<w:body(?:\s[^>]*)?>/.exec(docInner);
+  if (bodyOpen === null) {
+    return {
+      ok: false,
+      error: "word/document.xml <w:document> lacks a <w:body> child",
+    };
+  }
+  const bodyStart = bodyOpen.index + bodyOpen[0].length;
+  const bodyClose = docInner.lastIndexOf("</w:body>");
+  if (bodyClose < bodyStart) {
+    return {
+      ok: false,
+      error: "word/document.xml lacks a closing </w:body> tag",
+    };
+  }
+  return { ok: true, bodyXml: docInner.slice(bodyStart, bodyClose) };
+}
+
 export function extractDocxText(docxBytes: Uint8Array): ExtractDocxTextResult {
   const archive = readZip(docxBytes);
   if (!archive.ok) return { ok: false, error: archive.error };
@@ -326,13 +374,15 @@ export function extractDocxText(docxBytes: Uint8Array): ExtractDocxTextResult {
     return { ok: false, error: "docx archive lacks word/document.xml" };
   }
   const xml = new TextDecoder().decode(docEntry.data);
+  const body = extractDocumentBodyXml(xml);
+  if (!body.ok) return body;
   const paragraphs: string[] = [];
   const paragraphPattern =
     /<w:p(?:\s[^>]*)?\/>|<w:p(?:\s[^>]*)?>([\s\S]*?)<\/w:p>/g;
   const tokenPattern =
     /<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>|<w:tab(?:\s[^>]*)?\/?>|<w:(?:br|cr)(?:\s[^>]*)?\/?>/g;
 
-  for (const pMatch of xml.matchAll(paragraphPattern)) {
+  for (const pMatch of body.bodyXml.matchAll(paragraphPattern)) {
     const inner = pMatch[1];
     if (inner === undefined) {
       paragraphs.push("");
