@@ -1,0 +1,11 @@
+Avery Kim
+Site Reliability Engineer | Kubernetes, Terraform, OpenTelemetry
+Melbourne | avery.kim@example.org
+
+Profile
+Infrastructure and SRE specialist running multi-region Kubernetes clusters, Terraform modules, and OpenTelemetry collectors.
+
+Experience
+Lead SRE, Pinecrest Telecom (May 2020 to present)
+- Administered six multi-region Kubernetes clusters with zero-downtime upgrades.
+- Built OpenTelemetry pipelines and Terraform landing zones; limited application coding in Node.js.

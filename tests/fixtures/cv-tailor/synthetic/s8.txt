@@ -1,0 +1,11 @@
+Drew Parker
+Platform Engineer | TypeScript Node.js PostgreSQL Terraform Kubernetes GraphQL OpenTelemetry CI/CD
+Melbourne | drew.parker@example.org
+
+Profile
+Results-driven synergy-focused engineer leveraging TypeScript, Node.js, PostgreSQL, Terraform, Kubernetes, GraphQL, OpenTelemetry, CI/CD, Agile, Cloud, DevOps.
+
+Experience
+Software Consultant, Various Clients (2019 to present)
+- Worked on TypeScript, Node.js, PostgreSQL, Terraform, Kubernetes, GraphQL, and OpenTelemetry projects.
+- Collaborated with stakeholders to deliver innovative scalable cloud solutions.

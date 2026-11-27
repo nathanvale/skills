@@ -1,0 +1,11 @@
+Riley Chen
+Senior Full-Stack Engineer | Node.js, TypeScript, MySQL
+Melbourne | riley.chen@example.org
+
+Profile
+Seven years building Node.js and TypeScript SaaS products, mentoring junior developers, and improving deployment reliability.
+
+Experience
+Senior Engineer, Kestrel Health (August 2021 to present)
+- Developed TypeScript APIs and automated integration tests for scheduling workflows.
+- Supported Docker builds and CI/CD pipelines across staging and production.

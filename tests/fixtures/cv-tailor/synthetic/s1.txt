@@ -1,0 +1,12 @@
+Jordan Vance
+Staff Platform Engineer | TypeScript, Node.js, Kubernetes, Terraform
+Melbourne | jordan.vance@example.org
+
+Profile
+Ten years building distributed TypeScript backends, PostgreSQL pipelines, and multi-region Kubernetes clusters with OpenTelemetry observability.
+
+Experience
+Staff Platform Engineer, Redgum Cloud (January 2022 to present)
+- Operated multi-region Kubernetes clusters and Terraform modules for 40 microservices.
+- Built TypeScript and GraphQL federation gateways with full OpenTelemetry tracing.
+- Mentored eight engineers across platform and product squads.

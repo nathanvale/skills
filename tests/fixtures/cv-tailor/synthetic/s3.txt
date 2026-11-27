@@ -1,0 +1,11 @@
+Morgan Ellis
+Senior Software Engineer | TypeScript, React, Node.js
+Sydney | morgan.ellis@example.org
+
+Profile
+Full-stack engineer focused on TypeScript web apps and Node.js APIs with growing exposure to PostgreSQL and cloud deployment.
+
+Experience
+Senior Software Engineer, Sunbeam Media (June 2021 to present)
+- Delivered React portals and Node.js BFF services for 90,000 monthly active users.
+- Maintained GitHub Actions CI/CD workflows and unit test suites.

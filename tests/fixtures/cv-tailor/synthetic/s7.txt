@@ -1,0 +1,11 @@
+Jamie Singh
+Data Engineer | Spark, Airflow, PostgreSQL, Python
+Melbourne | jamie.singh@example.org
+
+Profile
+Data engineer building warehouse ETL pipelines, dbt models, and PostgreSQL marts for analytics teams.
+
+Experience
+Senior Data Engineer, Riverstone Energy (January 2021 to present)
+- Designed Airflow DAGs and PostgreSQL transformations for daily financial reporting.
+- Automated SQL quality checks in CI/CD pipelines.

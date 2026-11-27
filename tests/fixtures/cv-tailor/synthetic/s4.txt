@@ -1,0 +1,11 @@
+Casey Patel
+Senior Backend Engineer | Python, Go, PostgreSQL
+Melbourne | casey.patel@example.org
+
+Profile
+Backend engineer experienced in Python and Go data pipelines, PostgreSQL tuning, and Terraform infrastructure.
+
+Experience
+Senior Engineer, Ironbark Analytics (March 2020 to present)
+- Built event-driven ingestion services in Go and PostgreSQL with Prometheus metrics.
+- Managed Terraform infrastructure and CI/CD release gates.

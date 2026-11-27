@@ -1,0 +1,221 @@
+{
+  "terms": {
+    "terms": [
+      "TypeScript",
+      "PostgreSQL",
+      "Terraform",
+      "Kubernetes",
+      "GraphQL",
+      "OpenTelemetry"
+    ],
+    "files": [
+      {
+        "file": "new.pdf",
+        "found": ["TypeScript", "PostgreSQL", "Terraform", "OpenTelemetry"],
+        "missing": ["Kubernetes", "GraphQL"],
+        "foundCount": 4,
+        "totalCount": 6
+      },
+      {
+        "file": "expected/cv.docx",
+        "found": ["TypeScript", "PostgreSQL", "Terraform", "OpenTelemetry"],
+        "missing": ["Kubernetes", "GraphQL"],
+        "foundCount": 4,
+        "totalCount": 6
+      }
+    ]
+  },
+  "search": {
+    "queries": [
+      "TypeScript AND PostgreSQL AND Terraform",
+      "\"event-driven\" AND mentor* AND NOT Java",
+      "TypeScript AND Kubernetes"
+    ],
+    "files": [
+      {
+        "file": "new.pdf",
+        "results": [
+          {
+            "query": "TypeScript AND PostgreSQL AND Terraform",
+            "verdict": "HIT",
+            "absent": [],
+            "excludedPresent": []
+          },
+          {
+            "query": "\"event-driven\" AND mentor* AND NOT Java",
+            "verdict": "HIT",
+            "absent": [],
+            "excludedPresent": []
+          },
+          {
+            "query": "TypeScript AND Kubernetes",
+            "verdict": "MISS",
+            "absent": ["Kubernetes"],
+            "excludedPresent": []
+          }
+        ]
+      },
+      {
+        "file": "expected/cv.docx",
+        "results": [
+          {
+            "query": "TypeScript AND PostgreSQL AND Terraform",
+            "verdict": "HIT",
+            "absent": [],
+            "excludedPresent": []
+          },
+          {
+            "query": "\"event-driven\" AND mentor* AND NOT Java",
+            "verdict": "HIT",
+            "absent": [],
+            "excludedPresent": []
+          },
+          {
+            "query": "TypeScript AND Kubernetes",
+            "verdict": "MISS",
+            "absent": ["Kubernetes"],
+            "excludedPresent": []
+          }
+        ]
+      }
+    ]
+  },
+  "check": {
+    "verdict": "PASS",
+    "pdf": "new.pdf",
+    "docx": "expected/cv.docx",
+    "source": "cv.md",
+    "pages": 2,
+    "maxPages": 2,
+    "failures": 0,
+    "warnings": 1,
+    "checks": [
+      {
+        "scope": "source",
+        "status": "PASS",
+        "check": "no em or en dashes in the source",
+        "detail": null
+      },
+      {
+        "scope": "source",
+        "status": "WARN",
+        "check": "link 'Portfolio'",
+        "detail": "link 'Portfolio' hides https://example.com/alex; parsers see only the text"
+      },
+      {
+        "scope": "pdf",
+        "status": "PASS",
+        "check": "2 PDF pages (limit 2)",
+        "detail": null
+      },
+      {
+        "scope": "pdf-layout",
+        "status": "PASS",
+        "check": "name parses as 'Alex Example'",
+        "detail": null
+      },
+      {
+        "scope": "pdf-layout",
+        "status": "PASS",
+        "check": "email alex@example.com",
+        "detail": null
+      },
+      {
+        "scope": "pdf-layout",
+        "status": "PASS",
+        "check": "phone +61 400 000 000",
+        "detail": null
+      },
+      {
+        "scope": "pdf-layout",
+        "status": "PASS",
+        "check": "section headings 4 of 4 in order",
+        "detail": null
+      },
+      {
+        "scope": "pdf-layout",
+        "status": "PASS",
+        "check": "role headings and date lines 8 of 8 in order",
+        "detail": null
+      },
+      {
+        "scope": "pdf-raw",
+        "status": "PASS",
+        "check": "name parses as 'Alex Example'",
+        "detail": null
+      },
+      {
+        "scope": "pdf-raw",
+        "status": "PASS",
+        "check": "email alex@example.com",
+        "detail": null
+      },
+      {
+        "scope": "pdf-raw",
+        "status": "PASS",
+        "check": "phone +61 400 000 000",
+        "detail": null
+      },
+      {
+        "scope": "pdf-raw",
+        "status": "PASS",
+        "check": "section headings 4 of 4 in order",
+        "detail": null
+      },
+      {
+        "scope": "pdf-raw",
+        "status": "PASS",
+        "check": "role headings and date lines 8 of 8 in order",
+        "detail": null
+      },
+      {
+        "scope": "word",
+        "status": "PASS",
+        "check": "name parses as 'Alex Example'",
+        "detail": null
+      },
+      {
+        "scope": "word",
+        "status": "PASS",
+        "check": "email alex@example.com",
+        "detail": null
+      },
+      {
+        "scope": "word",
+        "status": "PASS",
+        "check": "phone +61 400 000 000",
+        "detail": null
+      },
+      {
+        "scope": "word",
+        "status": "PASS",
+        "check": "section headings 4 of 4 in order",
+        "detail": null
+      },
+      {
+        "scope": "word",
+        "status": "PASS",
+        "check": "role headings and date lines 8 of 8 in order",
+        "detail": null
+      },
+      {
+        "scope": "word",
+        "status": "PASS",
+        "check": "Markdown paragraphs in Word 29 of 29",
+        "detail": null
+      },
+      {
+        "scope": "terms",
+        "status": "PASS",
+        "check": "pdf: 4 of 4 terms",
+        "detail": null
+      },
+      {
+        "scope": "terms",
+        "status": "PASS",
+        "check": "word: 4 of 4 terms",
+        "detail": null
+      }
+    ]
+  }
+}
